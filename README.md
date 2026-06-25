@@ -21,14 +21,20 @@ the clipboard.
 - **Configurable per-key delay** (1–2000 ms) and **initial delay** (time to
   switch to the target window).
 - **Typing speed presets** (Very fast → Very slow).
+- **Multi-language UI** — English, Português (BR) and Español, switchable at
+  runtime.
+- **Focus guard** *(optional)* — if the focused window changes mid-typing (a
+  notification steals focus, you alt-tab by accident…), typing **pauses** and a
+  banner appears so you can **continue** (with a fresh countdown to refocus the
+  target) or **restart** and reconfigure. *(Windows; no-op elsewhere.)*
 - **Optional "minimize before typing"** so the app gets out of the way.
 - **Cancel anytime with `Esc`** — works even while minimized (the physical key
   is watched), or via the Cancel button.
 - **Paste-from-clipboard** button (fills the editor; never auto-types).
-- **Live status** (`Ready` / `Waiting…` / `Typing…` / `Finished` / `Cancelled`)
-  with a progress bar.
-- **Settings persistence** (delay, initial delay, minimize, window size) with a
-  **portable mode** fallback.
+- **Live status** (`Ready` / `Waiting…` / `Typing…` / `Paused` / `Finished` /
+  `Cancelled`) with a progress bar.
+- **Settings persistence** (delay, initial delay, minimize, focus guard,
+  language, window size) with a **portable mode** fallback.
 - **Background typing thread** — the UI never freezes.
 - **Minimal CLI** for preloading text/parameters.
 
@@ -124,11 +130,13 @@ There are two Windows toolchains:
 ```
 src/
   main.rs              entry point, CLI parsing, window bootstrap
+  i18n.rs              compile-time translations (en / pt-br / es)
   ui/    app.rs        egui application + update loop
          widgets.rs    small UI helpers
-  typing/engine.rs     char → keystroke engine
+  typing/engine.rs     char → keystroke engine (Typer)
          worker.rs     background typing thread + status channel
          cancel.rs     cancel flag + physical-Esc watcher
+         window.rs     foreground-window detection (focus guard)
   settings/config.rs   load/save settings (confy + portable mode)
   clipboard/clipboard.rs  clipboard read (arboard)
 ```

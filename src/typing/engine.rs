@@ -1,17 +1,10 @@
-//! The typing engine: turns a string into simulated keystrokes.
+//! The typing engine: maps characters to keystrokes.
 //!
-//! ```text
-//! for char in text:
-//!     if cancelled: break
-//!     send_key(char)
-//!     sleep(delay)   // in small slices, so cancel is responsive
-//! ```
-
-use std::time::Duration;
+//! [`Typer`] wraps the platform keyboard backend and sends one character at a
+//! time. The actual loop (timing, cancellation, focus-change detection) lives
+//! in [`super::worker`].
 
 use enigo::{Direction, Enigo, Key, Keyboard, Settings};
-
-use super::cancel::{CancelToken, EscWatcher};
 
 /// How an input character maps to a keystroke.
 #[derive(Debug, PartialEq)]
@@ -33,12 +26,6 @@ fn classify(c: char) -> CharAction {
         '\u{8}' | '\u{7f}' => CharAction::Backspace,
         _ => CharAction::Char(c),
     }
-}
-
-/// Result of a typing run.
-pub enum Outcome {
-    Finished,
-    Cancelled,
 }
 
 /// Errors raised while injecting keystrokes.
@@ -66,65 +53,37 @@ impl std::fmt::Display for TypeError {
     }
 }
 
-/// Type `text` character by character, sleeping `delay` between keys.
-///
-/// `on_progress` is called with the number of characters processed so far.
-/// Cancellation is checked before every key and during every sleep.
-pub fn run<F: FnMut(usize)>(
-    text: &str,
-    delay: Duration,
-    cancel: &CancelToken,
-    esc: &EscWatcher,
-    mut on_progress: F,
-) -> Result<Outcome, TypeError> {
-    let mut enigo =
-        Enigo::new(&Settings::default()).map_err(|e| TypeError::Init(e.to_string()))?;
+/// Wraps the keyboard backend; sends one character at a time.
+pub struct Typer {
+    enigo: Enigo,
+}
 
-    for (i, c) in text.chars().enumerate() {
-        if cancel.is_cancelled() || esc.esc_pressed() {
-            return Ok(Outcome::Cancelled);
-        }
+impl Typer {
+    pub fn new() -> Result<Self, TypeError> {
+        Enigo::new(&Settings::default())
+            .map(|enigo| Self { enigo })
+            .map_err(|e| TypeError::Init(e.to_string()))
+    }
 
+    /// Inject the keystroke(s) for a single character.
+    pub fn send(&mut self, c: char) -> Result<(), TypeError> {
         match classify(c) {
-            CharAction::Skip => {}
-            CharAction::Enter => press(&mut enigo, Key::Return)?,
-            CharAction::Tab => press(&mut enigo, Key::Tab)?,
-            CharAction::Backspace => press(&mut enigo, Key::Backspace)?,
-            CharAction::Char(ch) => enigo
+            CharAction::Skip => Ok(()),
+            CharAction::Enter => self.press(Key::Return),
+            CharAction::Tab => self.press(Key::Tab),
+            CharAction::Backspace => self.press(Key::Backspace),
+            CharAction::Char(ch) => self
+                .enigo
                 .text(ch.encode_utf8(&mut [0u8; 4]))
-                .map_err(|e| TypeError::Inject(e.to_string()))?,
-        }
-
-        on_progress(i + 1);
-
-        if !sleep_cancellable(delay, cancel, esc) {
-            return Ok(Outcome::Cancelled);
+                .map_err(|e| TypeError::Inject(e.to_string())),
         }
     }
 
-    Ok(Outcome::Finished)
-}
-
-fn press(enigo: &mut Enigo, key: Key) -> Result<(), TypeError> {
-    enigo
-        .key(key, Direction::Click)
-        .map_err(|e| TypeError::Inject(e.to_string()))
-}
-
-/// Sleep for `dur`, split into small slices so cancellation is responsive even
-/// with long per-key delays. Returns `false` if cancelled during the wait.
-fn sleep_cancellable(dur: Duration, cancel: &CancelToken, esc: &EscWatcher) -> bool {
-    const SLICE: Duration = Duration::from_millis(10);
-    let mut remaining = dur;
-    while remaining > Duration::ZERO {
-        if cancel.is_cancelled() || esc.esc_pressed() {
-            return false;
-        }
-        let step = remaining.min(SLICE);
-        std::thread::sleep(step);
-        remaining = remaining.saturating_sub(step);
+    fn press(&mut self, key: Key) -> Result<(), TypeError> {
+        self.enigo
+            .key(key, Direction::Click)
+            .map_err(|e| TypeError::Inject(e.to_string()))
     }
-    !(cancel.is_cancelled() || esc.esc_pressed())
 }
 
 #[cfg(test)]

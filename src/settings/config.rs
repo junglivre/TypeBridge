@@ -7,6 +7,8 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+use crate::i18n::Lang;
+
 const APP_NAME: &str = "typebridge";
 const CONFIG_NAME: &str = "config";
 const PORTABLE_FILE: &str = "typebridge.toml";
@@ -17,6 +19,8 @@ pub struct Config {
     pub delay_ms: u32,
     pub initial_delay_s: u32,
     pub minimize_before_typing: bool,
+    pub detect_window_change: bool,
+    pub language: Lang,
     pub window_width: f32,
     pub window_height: f32,
 }
@@ -27,6 +31,8 @@ impl Default for Config {
             delay_ms: 20,
             initial_delay_s: 3,
             minimize_before_typing: false,
+            detect_window_change: false,
+            language: Lang::default(),
             window_width: 520.0,
             window_height: 640.0,
         }
@@ -84,6 +90,8 @@ mod tests {
             delay_ms: 42,
             initial_delay_s: 7,
             minimize_before_typing: true,
+            detect_window_change: true,
+            language: Lang::PtBr,
             window_width: 700.0,
             window_height: 800.0,
         };
@@ -92,5 +100,7 @@ mod tests {
         assert_eq!(back.delay_ms, 42);
         assert_eq!(back.initial_delay_s, 7);
         assert!(back.minimize_before_typing);
+        assert!(back.detect_window_change);
+        assert_eq!(back.language, Lang::PtBr);
     }
 }

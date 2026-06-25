@@ -1,13 +1,16 @@
 //! The egui application: state, layout and the update loop.
 
+use std::sync::atomic::Ordering;
 use std::sync::mpsc::TryRecvError;
 use std::time::Duration;
 
 use eframe::egui::{self, Color32};
 
 use crate::clipboard::clipboard as clip;
+use crate::i18n::Lang;
 use crate::settings::config::Config;
-use crate::typing::worker::{self, TypingJob, WorkerMsg};
+use crate::typing::window;
+use crate::typing::worker::{self, JobConfig, TypingJob, WorkerMsg};
 use crate::CliArgs;
 
 use super::widgets;
@@ -17,6 +20,7 @@ enum Phase {
     Idle,
     Waiting,
     Typing,
+    Paused,
     Finished,
     Cancelled,
     Error,
@@ -28,6 +32,8 @@ pub struct TypeBridgeApp {
     delay_ms: u32,
     initial_delay_s: u32,
     minimize: bool,
+    detect_window_change: bool,
+    lang: Lang,
 
     // --- runtime state ---
     phase: Phase,
@@ -43,7 +49,6 @@ pub struct TypeBridgeApp {
 
 impl TypeBridgeApp {
     pub fn new(cc: &eframe::CreationContext<'_>, cfg: Config, cli: CliArgs) -> Self {
-        // A touch more breathing room than the default theme.
         cc.egui_ctx.style_mut(|s| {
             s.spacing.item_spacing = egui::vec2(8.0, 8.0);
             s.spacing.button_padding = egui::vec2(10.0, 6.0);
@@ -54,6 +59,8 @@ impl TypeBridgeApp {
             delay_ms: cfg.delay_ms.clamp(1, 2000),
             initial_delay_s: cfg.initial_delay_s.min(60),
             minimize: cfg.minimize_before_typing,
+            detect_window_change: cfg.detect_window_change,
+            lang: cfg.language,
             phase: Phase::Idle,
             error_msg: None,
             typed: 0,
@@ -64,7 +71,6 @@ impl TypeBridgeApp {
             autostart_pending: false,
         };
 
-        // Apply CLI overrides.
         if let Some(d) = cli.delay_ms {
             app.delay_ms = d.clamp(1, 2000);
         }
@@ -88,7 +94,7 @@ impl TypeBridgeApp {
 
     fn start_typing(&mut self, ctx: &egui::Context) {
         if self.text.trim().is_empty() {
-            self.error_msg = Some("No text to type.".to_owned());
+            self.error_msg = Some(self.lang.s().no_text.to_owned());
             self.phase = Phase::Error;
             return;
         }
@@ -99,7 +105,6 @@ impl TypeBridgeApp {
         self.phase = Phase::Waiting;
         self.wait_remaining_ms = (self.initial_delay_s as u64) * 1000;
 
-        // Persist current settings before we (possibly) minimize.
         self.save_config(ctx);
 
         self.minimized_for_job = self.minimize;
@@ -109,12 +114,28 @@ impl TypeBridgeApp {
 
         let ctx_repaint = ctx.clone();
         let job = worker::start(
-            self.text.clone(),
-            self.delay_ms,
-            self.initial_delay_s,
+            JobConfig {
+                text: self.text.clone(),
+                delay_ms: self.delay_ms,
+                initial_delay_s: self.initial_delay_s,
+                detect_window_change: self.detect_window_change,
+            },
             move || ctx_repaint.request_repaint(),
         );
         self.job = Some(job);
+    }
+
+    /// Resume after a focus-change pause (re-runs the initial countdown so the
+    /// user can refocus the target window).
+    fn resume_job(&mut self, ctx: &egui::Context) {
+        let minimize = self.minimize;
+        if let Some(job) = &self.job {
+            if minimize {
+                ctx.send_viewport_cmd(egui::ViewportCommand::Minimized(true));
+            }
+            job.resume.store(true, Ordering::SeqCst);
+        }
+        self.phase = Phase::Waiting;
     }
 
     fn cancel_job(&self) {
@@ -130,6 +151,7 @@ impl TypeBridgeApp {
         };
 
         let mut terminal: Option<Phase> = None;
+        let mut just_paused = false;
         loop {
             match job.rx.try_recv() {
                 Ok(WorkerMsg::Waiting { remaining_ms }) => {
@@ -140,6 +162,12 @@ impl TypeBridgeApp {
                     self.phase = Phase::Typing;
                     self.typed = typed;
                     self.total = total;
+                }
+                Ok(WorkerMsg::WindowChanged { typed, total }) => {
+                    self.phase = Phase::Paused;
+                    self.typed = typed;
+                    self.total = total;
+                    just_paused = true;
                 }
                 Ok(WorkerMsg::Finished) => terminal = Some(Phase::Finished),
                 Ok(WorkerMsg::Cancelled) => terminal = Some(Phase::Cancelled),
@@ -160,7 +188,6 @@ impl TypeBridgeApp {
         match terminal {
             Some(end) => {
                 self.phase = end;
-                // job dropped here -> thread detached (already finishing).
                 if self.minimized_for_job {
                     ctx.send_viewport_cmd(egui::ViewportCommand::Minimized(false));
                     ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
@@ -168,7 +195,11 @@ impl TypeBridgeApp {
                 }
             }
             None => {
-                // Still running: put it back.
+                // Bring our window forward so the user sees the pause banner.
+                if just_paused {
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Minimized(false));
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
+                }
                 self.job = Some(job);
             }
         }
@@ -180,6 +211,8 @@ impl TypeBridgeApp {
             delay_ms: self.delay_ms,
             initial_delay_s: self.initial_delay_s,
             minimize_before_typing: self.minimize,
+            detect_window_change: self.detect_window_change,
+            language: self.lang,
             window_width: size.x,
             window_height: size.y,
         };
@@ -187,47 +220,94 @@ impl TypeBridgeApp {
     }
 
     fn status(&self) -> (String, Color32) {
+        let s = self.lang.s();
         match self.phase {
-            Phase::Idle => ("Ready".to_owned(), Color32::from_rgb(120, 160, 220)),
+            Phase::Idle => (s.ready.to_owned(), Color32::from_rgb(120, 160, 220)),
             Phase::Waiting => (
-                format!("Waiting... {:.1}s", self.wait_remaining_ms as f32 / 1000.0),
+                format!("{} {:.1}s", s.waiting, self.wait_remaining_ms as f32 / 1000.0),
                 Color32::from_rgb(230, 170, 60),
             ),
-            Phase::Typing => ("Typing...".to_owned(), Color32::from_rgb(90, 190, 120)),
-            Phase::Finished => ("Finished".to_owned(), Color32::from_rgb(90, 200, 110)),
-            Phase::Cancelled => ("Cancelled".to_owned(), Color32::from_rgb(220, 180, 70)),
-            Phase::Error => ("Error".to_owned(), Color32::from_rgb(225, 90, 90)),
+            Phase::Typing => (s.typing.to_owned(), Color32::from_rgb(90, 190, 120)),
+            Phase::Paused => (s.paused.to_owned(), Color32::from_rgb(230, 170, 60)),
+            Phase::Finished => (s.finished.to_owned(), Color32::from_rgb(90, 200, 110)),
+            Phase::Cancelled => (s.cancelled.to_owned(), Color32::from_rgb(220, 180, 70)),
+            Phase::Error => (s.error.to_owned(), Color32::from_rgb(225, 90, 90)),
         }
     }
 
     fn body(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
+        let s = self.lang.s();
         let running = self.running();
 
-        ui.heading("TypeBridge");
-        ui.label(
-            egui::RichText::new("Types text into the focused window — no clipboard, no paste.")
-                .weak(),
-        );
+        // ---- Header + language selector ----
+        ui.horizontal(|ui| {
+            ui.heading("TypeBridge");
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                let prev = self.lang;
+                egui::ComboBox::from_id_salt("lang_combo")
+                    .selected_text(self.lang.label())
+                    .show_ui(ui, |ui| {
+                        for l in Lang::ALL {
+                            ui.selectable_value(&mut self.lang, l, l.label());
+                        }
+                    });
+                ui.label(format!("{}:", s.language));
+                if self.lang != prev {
+                    self.save_config(ctx);
+                }
+            });
+        });
+        ui.label(egui::RichText::new(s.subtitle).weak());
         ui.add_space(4.0);
 
         // ---- Text ----
-        ui.label("Text");
+        ui.label(s.text);
         ui.add_enabled(
             !running,
             egui::TextEdit::multiline(&mut self.text)
-                .desired_rows(12)
+                .desired_rows(11)
                 .desired_width(f32::INFINITY)
-                .hint_text("Type or paste the text to send..."),
+                .hint_text(s.hint),
         );
+
+        // ---- Clipboard / Clear (right below the text field) ----
+        ui.horizontal(|ui| {
+            if ui
+                .add_enabled(!running, egui::Button::new(s.paste_clipboard))
+                .clicked()
+            {
+                match clip::get_text() {
+                    Ok(t) => {
+                        self.text = t;
+                        self.error_msg = None;
+                        if !running {
+                            self.phase = Phase::Idle;
+                        }
+                    }
+                    Err(detail) => {
+                        self.error_msg = Some(format!("{} ({detail})", s.clipboard_error));
+                        self.phase = Phase::Error;
+                    }
+                }
+            }
+            if ui
+                .add_enabled(!running && !self.text.is_empty(), egui::Button::new(s.clear))
+                .clicked()
+            {
+                self.text.clear();
+                self.phase = Phase::Idle;
+                self.error_msg = None;
+            }
+        });
         ui.label(
-            egui::RichText::new(format!("{} characters", self.text.chars().count())).weak(),
+            egui::RichText::new(format!("{} {}", self.text.chars().count(), s.characters)).weak(),
         );
 
         ui.add_space(4.0);
 
         // ---- Timing ----
         ui.horizontal(|ui| {
-            ui.label("Delay between keys");
+            ui.label(s.delay_between_keys);
             ui.add_enabled(
                 !running,
                 egui::DragValue::new(&mut self.delay_ms)
@@ -237,7 +317,7 @@ impl TypeBridgeApp {
             );
         });
         ui.horizontal(|ui| {
-            ui.label("Initial delay");
+            ui.label(s.initial_delay);
             ui.add_enabled(
                 !running,
                 egui::DragValue::new(&mut self.initial_delay_s)
@@ -245,18 +325,18 @@ impl TypeBridgeApp {
                     .speed(0.1)
                     .suffix(" s"),
             );
-            ui.label(egui::RichText::new("(time to switch to the target window)").weak());
+            ui.label(egui::RichText::new(s.initial_delay_help).weak());
         });
 
         // ---- Speed presets ----
         ui.horizontal(|ui| {
-            ui.label("Presets:");
+            ui.label(s.presets);
             for (name, ms) in [
-                ("Very fast", 2u32),
-                ("Fast", 8),
-                ("Normal", 20),
-                ("Slow", 60),
-                ("Very slow", 150),
+                (s.very_fast, 2u32),
+                (s.fast, 8),
+                (s.normal, 20),
+                (s.slow, 60),
+                (s.very_slow, 150),
             ] {
                 let selected = self.delay_ms == ms;
                 if ui
@@ -268,54 +348,36 @@ impl TypeBridgeApp {
             }
         });
 
-        ui.add_enabled(
-            !running,
-            egui::Checkbox::new(&mut self.minimize, "Minimize window before typing"),
-        );
+        // ---- Options ----
+        if ui
+            .add_enabled(!running, egui::Checkbox::new(&mut self.minimize, s.minimize_before))
+            .changed()
+        {
+            self.save_config(ctx);
+        }
+        ui.horizontal(|ui| {
+            let resp = ui.add_enabled(
+                !running && window::SUPPORTED,
+                egui::Checkbox::new(&mut self.detect_window_change, s.detect_window_change),
+            );
+            if resp.changed() {
+                self.save_config(ctx);
+            }
+            ui.label(egui::RichText::new(s.detect_window_change_help).weak());
+        });
 
         ui.separator();
 
-        // ---- Actions ----
-        ui.horizontal(|ui| {
-            if ui
-                .add_enabled(!running, egui::Button::new("📋 Paste Clipboard"))
-                .clicked()
-            {
-                match clip::get_text() {
-                    Ok(t) => {
-                        self.text = t;
-                        self.error_msg = None;
-                        if !running {
-                            self.phase = Phase::Idle;
-                        }
-                    }
-                    Err(e) => {
-                        self.error_msg = Some(e);
-                        self.phase = Phase::Error;
-                    }
-                }
-            }
-            if ui
-                .add_enabled(!running && !self.text.is_empty(), egui::Button::new("🗑 Clear"))
-                .clicked()
-            {
-                self.text.clear();
-                self.phase = Phase::Idle;
-                self.error_msg = None;
-            }
-        });
-
-        ui.add_space(2.0);
-
+        // ---- Start / Cancel ----
         if running {
             if ui
-                .add_sized([ui.available_width(), 38.0], egui::Button::new("■  Cancel (Esc)"))
+                .add_sized([ui.available_width(), 38.0], egui::Button::new(s.cancel))
                 .clicked()
             {
                 self.cancel_job();
             }
         } else if ui
-            .add_sized([ui.available_width(), 38.0], egui::Button::new("▶  Start Typing"))
+            .add_sized([ui.available_width(), 38.0], egui::Button::new(s.start_typing))
             .clicked()
         {
             self.start_typing(ctx);
@@ -326,17 +388,41 @@ impl TypeBridgeApp {
         // ---- Status ----
         let (label, color) = self.status();
         ui.horizontal(|ui| {
-            ui.label("Status:");
+            ui.label(s.status);
             widgets::status_badge(ui, &label, color);
         });
 
-        if self.phase == Phase::Typing && self.total > 0 {
+        if (self.phase == Phase::Typing || self.phase == Phase::Paused) && self.total > 0 {
             let frac = self.typed as f32 / self.total as f32;
             ui.add(
                 egui::ProgressBar::new(frac)
                     .text(format!("{}/{}", self.typed, self.total))
                     .desired_width(f32::INFINITY),
             );
+        }
+
+        // ---- Focus-change pause banner ----
+        if self.phase == Phase::Paused {
+            let mut do_resume = false;
+            let mut do_restart = false;
+            egui::Frame::group(ui.style()).show(ui, |ui| {
+                ui.colored_label(Color32::from_rgb(230, 170, 60), s.window_changed_title);
+                ui.label(s.window_changed_msg);
+                ui.horizontal(|ui| {
+                    if ui.button(s.continue_btn).clicked() {
+                        do_resume = true;
+                    }
+                    if ui.button(s.restart_btn).clicked() {
+                        do_restart = true;
+                    }
+                });
+            });
+            if do_resume {
+                self.resume_job(ctx);
+            }
+            if do_restart {
+                self.cancel_job();
+            }
         }
 
         if let Some(err) = &self.error_msg {
@@ -349,24 +435,20 @@ impl eframe::App for TypeBridgeApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.poll_job(ctx);
 
-        // CLI autostart (once).
         if self.autostart_pending && !self.running() && self.phase == Phase::Idle {
             self.autostart_pending = false;
             self.start_typing(ctx);
         }
 
-        // Esc cancels while the window is focused; the worker also watches the
-        // physical Esc key for when we are minimized.
+        // Esc cancels while focused; the worker also watches the physical key.
         if self.running() && ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
             self.cancel_job();
         }
 
-        // Keep the UI live while a job runs (we may be minimized).
         if self.running() {
             ctx.request_repaint_after(Duration::from_millis(50));
         }
 
-        // Persist settings (incl. window size) on close.
         if ctx.input(|i| i.viewport().close_requested()) {
             self.save_config(ctx);
         }
