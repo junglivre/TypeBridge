@@ -33,8 +33,8 @@ impl Default for Config {
             minimize_before_typing: false,
             detect_window_change: false,
             language: Lang::default(),
-            window_width: 520.0,
-            window_height: 640.0,
+            window_width: 540.0,
+            window_height: 720.0,
         }
     }
 }

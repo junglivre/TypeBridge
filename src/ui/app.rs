@@ -199,6 +199,9 @@ impl TypeBridgeApp {
                 if just_paused {
                     ctx.send_viewport_cmd(egui::ViewportCommand::Minimized(false));
                     ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
+                    ctx.send_viewport_cmd(egui::ViewportCommand::RequestUserAttention(
+                        egui::UserAttentionType::Critical,
+                    ));
                 }
                 self.job = Some(job);
             }
@@ -401,32 +404,61 @@ impl TypeBridgeApp {
             );
         }
 
-        // ---- Focus-change pause banner ----
-        if self.phase == Phase::Paused {
-            let mut do_resume = false;
-            let mut do_restart = false;
-            egui::Frame::group(ui.style()).show(ui, |ui| {
-                ui.colored_label(Color32::from_rgb(230, 170, 60), s.window_changed_title);
-                ui.label(s.window_changed_msg);
-                ui.horizontal(|ui| {
-                    if ui.button(s.continue_btn).clicked() {
-                        do_resume = true;
-                    }
-                    if ui.button(s.restart_btn).clicked() {
-                        do_restart = true;
-                    }
-                });
-            });
-            if do_resume {
-                self.resume_job(ctx);
-            }
-            if do_restart {
-                self.cancel_job();
-            }
-        }
-
         if let Some(err) = &self.error_msg {
             ui.colored_label(Color32::from_rgb(225, 110, 110), err);
+        }
+    }
+
+    /// A prominent modal shown when typing is paused by a focus change.
+    fn focus_modal(&mut self, ctx: &egui::Context) {
+        let s = self.lang.s();
+        let (typed, total) = (self.typed, self.total);
+        let mut do_resume = false;
+        let mut do_restart = false;
+
+        egui::Modal::new(egui::Id::new("focus_modal")).show(ctx, |ui| {
+            ui.set_width(380.0);
+            ui.vertical_centered(|ui| {
+                widgets::warning_icon(ui, 56.0);
+                ui.add_space(8.0);
+                ui.label(
+                    egui::RichText::new(s.window_changed_title)
+                        .size(19.0)
+                        .strong()
+                        .color(Color32::from_rgb(230, 80, 80)),
+                );
+                ui.add_space(8.0);
+                ui.label(s.window_changed_msg);
+                if total > 0 {
+                    ui.add_space(4.0);
+                    ui.label(egui::RichText::new(format!("{typed}/{total}")).weak());
+                }
+                ui.add_space(16.0);
+            });
+            ui.horizontal(|ui| {
+                if ui
+                    .add_sized(
+                        [176.0, 36.0],
+                        egui::Button::new(egui::RichText::new(s.continue_btn).strong()),
+                    )
+                    .clicked()
+                {
+                    do_resume = true;
+                }
+                if ui
+                    .add_sized([176.0, 36.0], egui::Button::new(s.restart_btn))
+                    .clicked()
+                {
+                    do_restart = true;
+                }
+            });
+        });
+
+        if do_resume {
+            self.resume_job(ctx);
+        }
+        if do_restart {
+            self.cancel_job();
         }
     }
 }
@@ -454,7 +486,16 @@ impl eframe::App for TypeBridgeApp {
         }
 
         egui::CentralPanel::default().show(ctx, |ui| {
-            self.body(ui, ctx);
+            egui::ScrollArea::vertical()
+                .auto_shrink([false, false])
+                .show(ui, |ui| {
+                    self.body(ui, ctx);
+                });
         });
+
+        // A focus change while typing surfaces a prominent modal.
+        if self.phase == Phase::Paused {
+            self.focus_modal(ctx);
+        }
     }
 }

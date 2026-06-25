@@ -24,9 +24,10 @@ the clipboard.
 - **Multi-language UI** — English, Português (BR) and Español, switchable at
   runtime.
 - **Focus guard** *(optional)* — if the focused window changes mid-typing (a
-  notification steals focus, you alt-tab by accident…), typing **pauses** and a
-  banner appears so you can **continue** (with a fresh countdown to refocus the
-  target) or **restart** and reconfigure. *(Windows; no-op elsewhere.)*
+  notification steals focus, you alt-tab by accident…), typing **pauses**, the
+  window pops to the front (and flashes in the taskbar), and a prominent modal
+  alert lets you **continue** (with a fresh countdown to refocus the target) or
+  **restart** and reconfigure. *(Windows; no-op elsewhere.)*
 - **Optional "minimize before typing"** so the app gets out of the way.
 - **Cancel anytime with `Esc`** — works even while minimized (the physical key
   is watched), or via the Cancel button.
