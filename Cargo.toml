@@ -1,0 +1,22 @@
+[package]
+name = "typebridge"
+version = "0.1.0"
+edition = "2021"
+description = "Types arbitrary text into the currently focused window (VNC, KVM, consoles, BIOS/IPMI)."
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+eframe = "0.31"
+egui = "0.31"
+enigo = "0.3"
+arboard = "3"
+serde = { version = "1", features = ["derive"] }
+confy = "0.6"
+device_query = "2"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
