@@ -64,3 +64,33 @@ impl Config {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn defaults_match_roadmap() {
+        let c = Config::default();
+        assert_eq!(c.delay_ms, 20, "default per-key delay is 20 ms");
+        assert_eq!(c.initial_delay_s, 3, "default initial delay is 3 s");
+        assert!(!c.minimize_before_typing);
+        assert!(c.window_width >= 360.0 && c.window_height >= 420.0);
+    }
+
+    #[test]
+    fn round_trips_through_toml() {
+        let c = Config {
+            delay_ms: 42,
+            initial_delay_s: 7,
+            minimize_before_typing: true,
+            window_width: 700.0,
+            window_height: 800.0,
+        };
+        let toml = toml::to_string(&c).expect("serialize");
+        let back: Config = toml::from_str(&toml).expect("deserialize");
+        assert_eq!(back.delay_ms, 42);
+        assert_eq!(back.initial_delay_s, 7);
+        assert!(back.minimize_before_typing);
+    }
+}

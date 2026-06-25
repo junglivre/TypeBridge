@@ -1,1 +1,8 @@
 /target
+
+# Local, machine-specific build configuration (toolchain paths). Not portable;
+# do not publish. See README for the windows-gnu toolchain notes.
+/.cargo/
+
+# Portable-mode config that TypeBridge may write next to the executable.
+/typebridge.toml

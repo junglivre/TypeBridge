@@ -3217,6 +3217,7 @@ dependencies = [
  "egui",
  "enigo",
  "serde",
+ "toml",
 ]
 
 [[package]]

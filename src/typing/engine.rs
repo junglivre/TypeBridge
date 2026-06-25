@@ -14,6 +14,7 @@ use enigo::{Direction, Enigo, Key, Keyboard, Settings};
 use super::cancel::{CancelToken, EscWatcher};
 
 /// How an input character maps to a keystroke.
+#[derive(Debug, PartialEq)]
 enum CharAction {
     /// A printable character, typed via Unicode injection.
     Char(char),
@@ -124,4 +125,26 @@ fn sleep_cancellable(dur: Duration, cancel: &CancelToken, esc: &EscWatcher) -> b
         remaining = remaining.saturating_sub(step);
     }
     !(cancel.is_cancelled() || esc.esc_pressed())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn control_chars_map_to_special_keys() {
+        assert_eq!(classify('\n'), CharAction::Enter);
+        assert_eq!(classify('\t'), CharAction::Tab);
+        assert_eq!(classify('\r'), CharAction::Skip);
+        assert_eq!(classify('\u{8}'), CharAction::Backspace);
+        assert_eq!(classify('\u{7f}'), CharAction::Backspace);
+    }
+
+    #[test]
+    fn printable_and_unicode_pass_through() {
+        assert_eq!(classify('a'), CharAction::Char('a'));
+        assert_eq!(classify(' '), CharAction::Char(' '));
+        assert_eq!(classify('é'), CharAction::Char('é'));
+        assert_eq!(classify('🚀'), CharAction::Char('🚀'));
+    }
 }

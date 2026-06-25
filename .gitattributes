@@ -1,0 +1,7 @@
+# Normalize line endings: store as LF in the repo, check out native locally.
+* text=auto
+
+*.rs    text eol=lf
+*.toml  text eol=lf
+*.md    text eol=lf
+*.lock  text eol=lf

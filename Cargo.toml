@@ -14,6 +14,9 @@ serde = { version = "1", features = ["derive"] }
 confy = "0.6"
 device_query = "2"
 
+[dev-dependencies]
+toml = "0.8"
+
 [profile.release]
 opt-level = "s"
 lto = true

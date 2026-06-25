@@ -28,6 +28,10 @@ pub struct CliArgs {
 }
 
 fn parse_cli() -> CliArgs {
+    parse_cli_args(std::env::args().skip(1))
+}
+
+fn parse_cli_args<I: Iterator<Item = String>>(args: I) -> CliArgs {
     let mut cli = CliArgs {
         delay_ms: None,
         wait_s: None,
@@ -36,7 +40,7 @@ fn parse_cli() -> CliArgs {
         autostart: false,
     };
 
-    let mut args = std::env::args().skip(1);
+    let mut args = args;
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--delay" => cli.delay_ms = args.next().and_then(|v| v.parse().ok()),
@@ -58,6 +62,53 @@ fn parse_cli() -> CliArgs {
     }
 
     cli
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn args(items: &[&str]) -> std::vec::IntoIter<String> {
+        items
+            .iter()
+            .map(|s| s.to_string())
+            .collect::<Vec<_>>()
+            .into_iter()
+    }
+
+    #[test]
+    fn parses_all_flags() {
+        let c = parse_cli_args(args(&[
+            "--delay", "25", "--wait", "5", "--minimize", "--text", "hi", "--autostart",
+        ]));
+        assert_eq!(c.delay_ms, Some(25));
+        assert_eq!(c.wait_s, Some(5));
+        assert_eq!(c.minimize, Some(true));
+        assert_eq!(c.text.as_deref(), Some("hi"));
+        assert!(c.autostart);
+    }
+
+    #[test]
+    fn no_minimize_overrides() {
+        let c = parse_cli_args(args(&["--no-minimize"]));
+        assert_eq!(c.minimize, Some(false));
+    }
+
+    #[test]
+    fn empty_args_are_all_none() {
+        let c = parse_cli_args(std::iter::empty());
+        assert!(c.delay_ms.is_none());
+        assert!(c.wait_s.is_none());
+        assert!(c.minimize.is_none());
+        assert!(c.text.is_none());
+        assert!(!c.autostart);
+    }
+
+    #[test]
+    fn bad_numbers_are_ignored() {
+        let c = parse_cli_args(args(&["--delay", "abc"]));
+        assert!(c.delay_ms.is_none());
+    }
 }
 
 fn main() -> eframe::Result<()> {
