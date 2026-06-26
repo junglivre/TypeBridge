@@ -86,7 +86,12 @@ fn fetch_latest() -> Result<Release, ()> {
     }
 
     let url = api_latest_url().ok_or(())?;
+    // ureq's `native-tls` feature provides the crate but doesn't auto-register
+    // it as the backend, so we wire the connector in explicitly (SChannel on
+    // Windows, OpenSSL on Linux, Secure Transport on macOS).
+    let connector = native_tls::TlsConnector::new().map_err(|_| ())?;
     let agent = ureq::AgentBuilder::new()
+        .tls_connector(Arc::new(connector))
         .timeout_connect(Duration::from_secs(8))
         .timeout_read(Duration::from_secs(8))
         .build();

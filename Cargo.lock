@@ -3340,7 +3340,7 @@ dependencies = [
 
 [[package]]
 name = "typebridge"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "arboard",
  "confy",
@@ -3348,6 +3348,7 @@ dependencies = [
  "eframe",
  "egui",
  "enigo",
+ "native-tls",
  "serde",
  "toml",
  "ureq",

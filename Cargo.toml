@@ -1,6 +1,6 @@
 [package]
 name = "typebridge"
-version = "1.0.0"
+version = "1.0.1"
 edition = "2021"
 description = "Types arbitrary text into the currently focused window (VNC, KVM, consoles, BIOS/IPMI)."
 license = "MIT OR Apache-2.0"
@@ -15,6 +15,7 @@ serde = { version = "1", features = ["derive"] }
 confy = "0.6"
 device_query = "2"
 ureq = { version = "2", default-features = false, features = ["native-tls", "json"] }
+native-tls = "0.2"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.59", features = [
