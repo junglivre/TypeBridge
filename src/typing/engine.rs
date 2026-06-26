@@ -4,21 +4,41 @@
 //! time. The loop (timing, cancellation, focus detection) lives in
 //! [`super::worker`].
 //!
-//! ## Unicode vs. physical keys
-//!
-//! Two ways to inject a printable character on Windows:
+//! ## Keystroke methods ([`KeyMode`])
 //!
 //! * **Unicode** (`enigo.text`) — injects the character via `KEYEVENTF_UNICODE`.
-//!   Works for any character in local apps, but many remote clients (noVNC,
-//!   RDP, KVM-over-IP, some games) ignore these synthetic Unicode events: they
-//!   read *physical* scancodes + modifier state, so `#` arrives as `3` and
-//!   uppercase letters arrive lowercase (the Shift modifier is never pressed).
-//! * **Physical keys** — presses the real keys a human would: the base key by
-//!   scancode plus the required `Shift`/`Ctrl`/`Alt` modifiers (computed with
-//!   `VkKeyScanExW`). This is what remote consoles expect. Characters that
-//!   aren't reachable on the active keyboard layout fall back to Unicode.
+//!   Universal for local apps, but remote clients (noVNC, RDP, KVM-over-IP) read
+//!   *physical* scancodes + modifier state and ignore these synthetic events.
+//! * **Physical — system layout** — presses the real base key (by scancode) plus
+//!   the Shift/Ctrl/Alt modifiers required to produce the character *on the
+//!   active Windows layout* (`VkKeyScanExW`). Correct when your local layout
+//!   matches the remote one.
+//! * **Physical — US layout** — same, but the base key + modifiers are resolved
+//!   against a fixed **US-QWERTY** map, regardless of your local layout. This is
+//!   what a US remote console (noVNC/QEMU in raw-scancode mode) expects, and it
+//!   needs no changes to your system keyboard settings. Characters that don't
+//!   exist on a US keyboard (e.g. `ç`, `á`) fall back to Unicode injection.
 
 use enigo::{Direction, Enigo, Key, Keyboard, Settings};
+use serde::{Deserialize, Serialize};
+
+/// Which method to use when injecting printable characters.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum KeyMode {
+    /// Unicode injection (best for local apps / any character).
+    Unicode,
+    /// Physical keys resolved against the active system layout.
+    PhysicalAuto,
+    /// Physical keys resolved against a fixed US-QWERTY layout (best for VNC).
+    PhysicalUs,
+}
+
+impl Default for KeyMode {
+    fn default() -> Self {
+        KeyMode::PhysicalAuto
+    }
+}
 
 /// How an input character maps to a keystroke.
 #[derive(Debug, PartialEq)]
@@ -70,18 +90,13 @@ impl std::fmt::Display for TypeError {
 /// Wraps the keyboard backend; sends one character at a time.
 pub struct Typer {
     enigo: Enigo,
-    /// When true, type printable characters as physical key presses (with real
-    /// modifiers) instead of Unicode injection. Recommended for VNC/remote.
-    physical_keys: bool,
+    mode: KeyMode,
 }
 
 impl Typer {
-    pub fn new(physical_keys: bool) -> Result<Self, TypeError> {
+    pub fn new(mode: KeyMode) -> Result<Self, TypeError> {
         Enigo::new(&Settings::default())
-            .map(|enigo| Self {
-                enigo,
-                physical_keys,
-            })
+            .map(|enigo| Self { enigo, mode })
             .map_err(|e| TypeError::Init(e.to_string()))
     }
 
@@ -92,13 +107,11 @@ impl Typer {
             CharAction::Enter => self.tap(Key::Return),
             CharAction::Tab => self.tap(Key::Tab),
             CharAction::Backspace => self.tap(Key::Backspace),
-            CharAction::Char(ch) => {
-                if self.physical_keys {
-                    self.send_physical(ch)
-                } else {
-                    self.send_unicode(ch)
-                }
-            }
+            CharAction::Char(ch) => match self.mode {
+                KeyMode::Unicode => self.send_unicode(ch),
+                KeyMode::PhysicalAuto => self.send_physical_auto(ch),
+                KeyMode::PhysicalUs => self.send_physical_us(ch),
+            },
         }
     }
 
@@ -114,40 +127,58 @@ impl Typer {
             .map_err(|e| TypeError::Inject(e.to_string()))
     }
 
+    // ---- Physical: system layout -----------------------------------------
+
+    #[cfg(windows)]
+    fn send_physical_auto(&mut self, ch: char) -> Result<(), TypeError> {
+        match resolve_key(ch) {
+            Some(p) => self.send_with_mods(p.scancode, p.shift, p.ctrl, p.alt),
+            None => self.send_unicode(ch),
+        }
+    }
+
     #[cfg(not(windows))]
-    fn send_physical(&mut self, ch: char) -> Result<(), TypeError> {
-        // Physical-key shift computation is implemented for Windows only; other
-        // platforms fall back to Unicode injection.
+    fn send_physical_auto(&mut self, ch: char) -> Result<(), TypeError> {
         self.send_unicode(ch)
     }
 
-    /// Press the base key (by scancode) together with the Shift/Ctrl/Alt
-    /// modifiers a real keyboard would use, so remote clients see proper input.
+    // ---- Physical: fixed US-QWERTY layout --------------------------------
+
     #[cfg(windows)]
-    fn send_physical(&mut self, ch: char) -> Result<(), TypeError> {
-        // Fall back to Unicode injection for characters we can't reach with a
-        // single physical key on the target's layout (dead-key combos, etc.).
-        let Some(plan) = resolve_key(ch) else {
-            return self.send_unicode(ch);
-        };
+    fn send_physical_us(&mut self, ch: char) -> Result<(), TypeError> {
+        match us_scancode(ch) {
+            Some((scancode, shift)) => self.send_with_mods(scancode, shift, false, false),
+            None => self.send_unicode(ch), // not present on a US keyboard
+        }
+    }
 
+    #[cfg(not(windows))]
+    fn send_physical_us(&mut self, ch: char) -> Result<(), TypeError> {
+        self.send_unicode(ch)
+    }
+
+    /// Hold the given modifiers, tap the base scancode, release the modifiers.
+    #[cfg(windows)]
+    fn send_with_mods(
+        &mut self,
+        scancode: u16,
+        shift: bool,
+        ctrl: bool,
+        alt: bool,
+    ) -> Result<(), TypeError> {
         let mods = [
-            (plan.shift, Key::Shift),
-            (plan.ctrl, Key::Control),
-            (plan.alt, Key::Alt),
+            (shift, Key::Shift),
+            (ctrl, Key::Control),
+            (alt, Key::Alt),
         ];
-
         for (needed, key) in mods {
             if needed {
                 self.hold(key, Direction::Press)?;
             }
         }
-        // Send the base key by scancode (this avoids enigo's Key::Unicode path,
-        // which mis-handles shifted characters). Combined with the modifiers we
-        // hold, this yields `ch`.
         let result = self
             .enigo
-            .raw(plan.scancode, Direction::Click)
+            .raw(scancode, Direction::Click)
             .map_err(|e| TypeError::Inject(e.to_string()));
         for (needed, key) in mods.into_iter().rev() {
             if needed {
@@ -174,9 +205,9 @@ struct KeyPlan {
     alt: bool,
 }
 
-/// Resolve a character to a base scancode + the modifiers needed to produce it
-/// on the target window's keyboard layout. Returns `None` when the character
-/// isn't reachable with a single physical key (the caller falls back to Unicode).
+/// Resolve a character to a base scancode + modifiers on the *active* keyboard
+/// layout. Returns `None` when the character isn't reachable with a single
+/// physical key (the caller falls back to Unicode).
 #[cfg(windows)]
 fn resolve_key(ch: char) -> Option<KeyPlan> {
     use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
@@ -186,13 +217,10 @@ fn resolve_key(ch: char) -> Option<KeyPlan> {
         GetForegroundWindow, GetWindowThreadProcessId,
     };
 
-    // Characters outside the BMP can't be expressed as a single VK.
     if (ch as u32) > 0xFFFF {
         return None;
     }
 
-    // Map the character to a virtual key + shift state on the target window's
-    // layout: low byte = virtual key, high byte = shift state.
     let (vk_scan, layout) = unsafe {
         let hwnd = GetForegroundWindow();
         let tid = GetWindowThreadProcessId(hwnd, std::ptr::null_mut());
@@ -206,8 +234,8 @@ fn resolve_key(ch: char) -> Option<KeyPlan> {
     let vk = (vk_scan as u16) & 0x00FF; // mask off the shift state
     let shift_state = ((vk_scan as u16) >> 8) & 0xFF;
 
-    // Translate the *masked* virtual key to its scancode. Passing the unmasked
-    // value (with the shift bits) yields scancode 0 — a dropped keystroke.
+    // Translate the *masked* virtual key to its scancode (the unmasked value
+    // would yield scancode 0 -> a dropped keystroke).
     let scancode = unsafe { MapVirtualKeyExW(vk as u32, MAPVK_VK_TO_VSC, layout) } as u16;
     if scancode == 0 {
         return None;
@@ -219,6 +247,99 @@ fn resolve_key(ch: char) -> Option<KeyPlan> {
         ctrl: shift_state & 2 != 0,
         alt: shift_state & 4 != 0,
     })
+}
+
+/// Map a character to a US-QWERTY (scancode, shift) pair, using PS/2 set-1
+/// scancodes. Returns `None` for characters that aren't on a US keyboard.
+#[cfg(windows)]
+fn us_scancode(ch: char) -> Option<(u16, bool)> {
+    if ch.is_ascii_lowercase() {
+        return Some((letter_scancode(ch), false));
+    }
+    if ch.is_ascii_uppercase() {
+        return Some((letter_scancode(ch.to_ascii_lowercase()), true));
+    }
+    let entry = match ch {
+        '1' => (0x02, false),
+        '!' => (0x02, true),
+        '2' => (0x03, false),
+        '@' => (0x03, true),
+        '3' => (0x04, false),
+        '#' => (0x04, true),
+        '4' => (0x05, false),
+        '$' => (0x05, true),
+        '5' => (0x06, false),
+        '%' => (0x06, true),
+        '6' => (0x07, false),
+        '^' => (0x07, true),
+        '7' => (0x08, false),
+        '&' => (0x08, true),
+        '8' => (0x09, false),
+        '*' => (0x09, true),
+        '9' => (0x0A, false),
+        '(' => (0x0A, true),
+        '0' => (0x0B, false),
+        ')' => (0x0B, true),
+        '-' => (0x0C, false),
+        '_' => (0x0C, true),
+        '=' => (0x0D, false),
+        '+' => (0x0D, true),
+        '[' => (0x1A, false),
+        '{' => (0x1A, true),
+        ']' => (0x1B, false),
+        '}' => (0x1B, true),
+        ';' => (0x27, false),
+        ':' => (0x27, true),
+        '\'' => (0x28, false),
+        '"' => (0x28, true),
+        '`' => (0x29, false),
+        '~' => (0x29, true),
+        '\\' => (0x2B, false),
+        '|' => (0x2B, true),
+        ',' => (0x33, false),
+        '<' => (0x33, true),
+        '.' => (0x34, false),
+        '>' => (0x34, true),
+        '/' => (0x35, false),
+        '?' => (0x35, true),
+        ' ' => (0x39, false),
+        _ => return None,
+    };
+    Some(entry)
+}
+
+/// US-QWERTY PS/2 set-1 scancode for a lowercase letter.
+#[cfg(windows)]
+fn letter_scancode(c: char) -> u16 {
+    match c {
+        'q' => 0x10,
+        'w' => 0x11,
+        'e' => 0x12,
+        'r' => 0x13,
+        't' => 0x14,
+        'y' => 0x15,
+        'u' => 0x16,
+        'i' => 0x17,
+        'o' => 0x18,
+        'p' => 0x19,
+        'a' => 0x1E,
+        's' => 0x1F,
+        'd' => 0x20,
+        'f' => 0x21,
+        'g' => 0x22,
+        'h' => 0x23,
+        'j' => 0x24,
+        'k' => 0x25,
+        'l' => 0x26,
+        'z' => 0x2C,
+        'x' => 0x2D,
+        'c' => 0x2E,
+        'v' => 0x2F,
+        'b' => 0x30,
+        'n' => 0x31,
+        'm' => 0x32,
+        _ => 0,
+    }
 }
 
 #[cfg(test)]
@@ -244,7 +365,6 @@ mod tests {
 
     /// Regression: enigo's `Key::Unicode` path produced scancode 0 for shifted
     /// characters, so `#`, capitals and `!` were dropped by VNC clients.
-    /// `resolve_key` must return a real scancode and flag Shift.
     #[cfg(windows)]
     #[test]
     fn shifted_chars_get_a_real_scancode() {
@@ -256,7 +376,23 @@ mod tests {
         assert!(!lower.shift, "'a' needs no Shift");
         assert_ne!(lower.scancode, 0);
 
-        // Upper- and lower-case of the same letter share the physical key.
         assert_eq!(upper.scancode, lower.scancode);
+    }
+
+    /// The fixed US map must produce the right scancode + shift regardless of
+    /// the host layout, and reject characters absent from a US keyboard.
+    #[cfg(windows)]
+    #[test]
+    fn us_layout_table_is_correct() {
+        assert_eq!(us_scancode('a'), Some((0x1E, false)));
+        assert_eq!(us_scancode('A'), Some((0x1E, true)));
+        assert_eq!(us_scancode('3'), Some((0x04, false)));
+        assert_eq!(us_scancode('#'), Some((0x04, true)));
+        assert_eq!(us_scancode('/'), Some((0x35, false)));
+        assert_eq!(us_scancode(';'), Some((0x27, false)));
+        assert_eq!(us_scancode('!'), Some((0x02, true)));
+        assert_eq!(us_scancode(' '), Some((0x39, false)));
+        assert_eq!(us_scancode('ç'), None);
+        assert_eq!(us_scancode('á'), None);
     }
 }

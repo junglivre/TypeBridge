@@ -16,7 +16,7 @@ use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
 use super::cancel::{CancelToken, EscWatcher};
-use super::engine::Typer;
+use super::engine::{KeyMode, Typer};
 use super::window;
 
 /// Messages sent from the worker thread to the UI.
@@ -38,7 +38,7 @@ pub struct JobConfig {
     pub delay_ms: u32,
     pub initial_delay_s: u32,
     pub detect_window_change: bool,
-    pub physical_keys: bool,
+    pub key_mode: KeyMode,
 }
 
 /// Handle to a running typing job.
@@ -91,7 +91,7 @@ fn run_job(
         return;
     }
 
-    let mut typer = match Typer::new(cfg.physical_keys) {
+    let mut typer = match Typer::new(cfg.key_mode) {
         Ok(t) => t,
         Err(e) => {
             let _ = tx.send(WorkerMsg::Error(e.to_string()));

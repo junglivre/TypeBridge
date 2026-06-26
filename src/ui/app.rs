@@ -9,6 +9,7 @@ use eframe::egui::{self, Color32};
 use crate::clipboard::clipboard as clip;
 use crate::i18n::Lang;
 use crate::settings::config::Config;
+use crate::typing::engine::KeyMode;
 use crate::typing::window;
 use crate::typing::worker::{self, JobConfig, TypingJob, WorkerMsg};
 use crate::CliArgs;
@@ -33,7 +34,7 @@ pub struct TypeBridgeApp {
     initial_delay_s: u32,
     minimize: bool,
     detect_window_change: bool,
-    physical_keys: bool,
+    key_mode: KeyMode,
     lang: Lang,
 
     // --- runtime state ---
@@ -61,7 +62,7 @@ impl TypeBridgeApp {
             initial_delay_s: cfg.initial_delay_s.min(60),
             minimize: cfg.minimize_before_typing,
             detect_window_change: cfg.detect_window_change,
-            physical_keys: cfg.physical_keys,
+            key_mode: cfg.key_mode,
             lang: cfg.language,
             phase: Phase::Idle,
             error_msg: None,
@@ -121,7 +122,7 @@ impl TypeBridgeApp {
                 delay_ms: self.delay_ms,
                 initial_delay_s: self.initial_delay_s,
                 detect_window_change: self.detect_window_change,
-                physical_keys: self.physical_keys,
+                key_mode: self.key_mode,
             },
             move || ctx_repaint.request_repaint(),
         );
@@ -218,7 +219,7 @@ impl TypeBridgeApp {
             initial_delay_s: self.initial_delay_s,
             minimize_before_typing: self.minimize,
             detect_window_change: self.detect_window_change,
-            physical_keys: self.physical_keys,
+            key_mode: self.key_mode,
             language: self.lang,
             window_width: size.x,
             window_height: size.y,
@@ -372,16 +373,35 @@ impl TypeBridgeApp {
             }
             ui.label(egui::RichText::new(s.detect_window_change_help).weak());
         });
-        ui.horizontal(|ui| {
-            let resp = ui.add_enabled(
-                !running,
-                egui::Checkbox::new(&mut self.physical_keys, s.physical_keys),
-            );
-            if resp.changed() {
-                self.save_config(ctx);
-            }
-            ui.label(egui::RichText::new(s.physical_keys_help).weak());
+        ui.add_enabled_ui(!running, |ui| {
+            ui.horizontal(|ui| {
+                ui.label(s.key_method);
+                let prev = self.key_mode;
+                egui::ComboBox::from_id_salt("key_mode_combo")
+                    .selected_text(match self.key_mode {
+                        KeyMode::Unicode => s.km_unicode,
+                        KeyMode::PhysicalAuto => s.km_physical_auto,
+                        KeyMode::PhysicalUs => s.km_physical_us,
+                    })
+                    .show_ui(ui, |ui| {
+                        ui.selectable_value(&mut self.key_mode, KeyMode::Unicode, s.km_unicode);
+                        ui.selectable_value(
+                            &mut self.key_mode,
+                            KeyMode::PhysicalAuto,
+                            s.km_physical_auto,
+                        );
+                        ui.selectable_value(
+                            &mut self.key_mode,
+                            KeyMode::PhysicalUs,
+                            s.km_physical_us,
+                        );
+                    });
+                if self.key_mode != prev {
+                    self.save_config(ctx);
+                }
+            });
         });
+        ui.label(egui::RichText::new(s.key_method_help).weak());
 
         ui.separator();
 

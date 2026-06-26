@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 use crate::i18n::Lang;
+use crate::typing::engine::KeyMode;
 
 const APP_NAME: &str = "typebridge";
 const CONFIG_NAME: &str = "config";
@@ -20,9 +21,9 @@ pub struct Config {
     pub initial_delay_s: u32,
     pub minimize_before_typing: bool,
     pub detect_window_change: bool,
-    /// Type printable characters as physical key presses (with real Shift/Ctrl/
-    /// Alt) instead of Unicode injection. Needed for VNC/RDP/remote consoles.
-    pub physical_keys: bool,
+    /// How printable characters are injected (Unicode vs. physical keys, and
+    /// against which layout). See [`KeyMode`].
+    pub key_mode: KeyMode,
     pub language: Lang,
     pub window_width: f32,
     pub window_height: f32,
@@ -35,7 +36,7 @@ impl Default for Config {
             initial_delay_s: 3,
             minimize_before_typing: false,
             detect_window_change: false,
-            physical_keys: true,
+            key_mode: KeyMode::default(),
             language: Lang::default(),
             window_width: 540.0,
             window_height: 720.0,
@@ -95,7 +96,7 @@ mod tests {
             initial_delay_s: 7,
             minimize_before_typing: true,
             detect_window_change: true,
-            physical_keys: false,
+            key_mode: KeyMode::PhysicalUs,
             language: Lang::PtBr,
             window_width: 700.0,
             window_height: 800.0,
@@ -106,7 +107,7 @@ mod tests {
         assert_eq!(back.initial_delay_s, 7);
         assert!(back.minimize_before_typing);
         assert!(back.detect_window_change);
-        assert!(!back.physical_keys);
+        assert_eq!(back.key_mode, KeyMode::PhysicalUs);
         assert_eq!(back.language, Lang::PtBr);
     }
 }
