@@ -9,7 +9,7 @@ repository = "https://github.com/junglivre/TypeBridge"
 [dependencies]
 eframe = "0.31"
 egui = "0.31"
-enigo = "0.3"
+enigo = { version = "0.3", default-features = false, features = ["x11rb"] }
 arboard = "3"
 serde = { version = "1", features = ["derive"] }
 confy = "0.6"

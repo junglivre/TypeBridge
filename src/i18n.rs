@@ -91,6 +91,10 @@ pub struct Strings {
     pub check_failed: &'static str,
     pub whats_new: &'static str,
     pub view_release: &'static str,
+    pub minimize_linux_warn: &'static str,
+    pub linux_notice_title: &'static str,
+    pub linux_notice_msg: &'static str,
+    pub ok_btn: &'static str,
 }
 
 static EN: Strings = Strings {
@@ -143,6 +147,10 @@ static EN: Strings = Strings {
     check_failed: "Couldn't check for updates",
     whats_new: "What's new",
     view_release: "View on GitHub",
+    minimize_linux_warn: "On Linux the window may not come back after typing (a desktop restriction, on both X11 and Wayland).",
+    linux_notice_title: "Heads up on Linux",
+    linux_notice_msg: "Keyboard injection on Linux can be unstable depending on your desktop environment. On Wayland the system will ask for permission to type — when the app starts and again on the first keystroke.",
+    ok_btn: "Got it",
 };
 
 static PT_BR: Strings = Strings {
@@ -195,6 +203,10 @@ static PT_BR: Strings = Strings {
     check_failed: "Não foi possível consultar atualizações",
     whats_new: "Novidades",
     view_release: "Ver no GitHub",
+    minimize_linux_warn: "No Linux a janela pode não voltar após digitar (restrição do desktop, tanto no X11 quanto no Wayland).",
+    linux_notice_title: "Atenção no Linux",
+    linux_notice_msg: "A injeção de teclado no Linux pode ser instável dependendo do seu ambiente de desktop. No Wayland o sistema vai pedir permissão para digitar — ao abrir o app e novamente na primeira digitação.",
+    ok_btn: "Entendi",
 };
 
 static ES: Strings = Strings {
@@ -247,4 +259,8 @@ static ES: Strings = Strings {
     check_failed: "No se pudo buscar actualizaciones",
     whats_new: "Novedades",
     view_release: "Ver en GitHub",
+    minimize_linux_warn: "En Linux la ventana puede no volver tras escribir (una restricción del escritorio, tanto en X11 como en Wayland).",
+    linux_notice_title: "Aviso en Linux",
+    linux_notice_msg: "La inyección de teclado en Linux puede ser inestable según tu entorno de escritorio. En Wayland el sistema pedirá permiso para escribir — al abrir la app y de nuevo en la primera pulsación.",
+    ok_btn: "Entendido",
 };

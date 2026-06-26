@@ -4,6 +4,18 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and the project follows
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- Linux: a startup notice explaining that keyboard injection can be unstable
+  depending on the desktop, and that Wayland prompts for permission to type.
+- Linux: a warning under "Minimize window before typing" that the window may not
+  come back, due to desktop restrictions (X11 or Wayland).
+
+### Changed
+- Linux: type via enigo's pure-Rust `x11rb` backend instead of `libxdo`, so
+  there is no `libxdo` dependency at build or runtime (more portable binaries).
+
 ## [1.0.1] - 2026-06-26
 
 ### Fixed

@@ -43,6 +43,8 @@ pub struct TypeBridgeApp {
     /// Whether the last update check was started by the user (controls whether
     /// "no new version" / "couldn't check" feedback is shown).
     update_manual: bool,
+    /// Linux-only startup notice about input limitations (dismissible).
+    show_linux_notice: bool,
     phase: Phase,
     error_msg: Option<String>,
     typed: usize,
@@ -71,6 +73,7 @@ impl TypeBridgeApp {
             lang: cfg.language,
             update_state: update::shared(),
             update_manual: false,
+            show_linux_notice: cfg!(target_os = "linux"),
             phase: Phase::Idle,
             error_msg: None,
             typed: 0,
@@ -378,6 +381,9 @@ impl TypeBridgeApp {
         {
             self.save_config(ctx);
         }
+        if cfg!(target_os = "linux") {
+            ui.label(egui::RichText::new(s.minimize_linux_warn).weak());
+        }
         ui.horizontal(|ui| {
             let resp = ui.add_enabled(
                 !running && window::SUPPORTED,
@@ -524,6 +530,40 @@ impl TypeBridgeApp {
         }
     }
 
+    /// One-time notice shown on Linux about keyboard-injection limitations.
+    fn linux_notice_modal(&mut self, ctx: &egui::Context) {
+        let s = self.lang.s();
+        let mut dismiss = false;
+        egui::Modal::new(egui::Id::new("linux_notice")).show(ctx, |ui| {
+            ui.set_width(380.0);
+            ui.vertical_centered(|ui| {
+                widgets::warning_icon(ui, 56.0);
+                ui.add_space(8.0);
+                ui.label(
+                    egui::RichText::new(s.linux_notice_title)
+                        .size(19.0)
+                        .strong()
+                        .color(Color32::from_rgb(230, 170, 60)),
+                );
+                ui.add_space(8.0);
+                ui.label(s.linux_notice_msg);
+                ui.add_space(16.0);
+                if ui
+                    .add_sized(
+                        [200.0, 34.0],
+                        egui::Button::new(egui::RichText::new(s.ok_btn).strong()),
+                    )
+                    .clicked()
+                {
+                    dismiss = true;
+                }
+            });
+        });
+        if dismiss {
+            self.show_linux_notice = false;
+        }
+    }
+
     /// A prominent modal shown when typing is paused by a focus change.
     fn focus_modal(&mut self, ctx: &egui::Context) {
         let s = self.lang.s();
@@ -607,6 +647,11 @@ impl eframe::App for TypeBridgeApp {
                     self.body(ui, ctx);
                 });
         });
+
+        // One-time Linux input-limitations notice on startup.
+        if self.show_linux_notice {
+            self.linux_notice_modal(ctx);
+        }
 
         // A focus change while typing surfaces a prominent modal.
         if self.phase == Phase::Paused {
