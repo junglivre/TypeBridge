@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/junglivre/TypeBridge/actions/workflows/ci.yml/badge.svg)](https://github.com/junglivre/TypeBridge/actions/workflows/ci.yml)
 [![Latest release](https://img.shields.io/github/v/release/junglivre/TypeBridge?sort=semver)](https://github.com/junglivre/TypeBridge/releases/latest)
+[![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue)](LICENSE-MIT)
 
 - **English**
 - [Português](README_br.md)
