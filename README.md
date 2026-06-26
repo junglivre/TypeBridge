@@ -1,5 +1,9 @@
 # TypeBridge
 
+- **English**
+- [Português](README_br.md)
+- [Español](README_es.md)
+
 A lightweight, cross-platform utility that **types arbitrary text into the
 currently focused window** — one keystroke at a time. Built for VNC, Guacamole,
 KVMs, remote consoles, web terminals, and BIOS/IPMI environments where
