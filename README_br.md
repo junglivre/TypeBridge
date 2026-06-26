@@ -14,7 +14,15 @@ transferência.
 
 - Nativo (Rust + [egui]/[eframe]), sem runtime Electron/Java/Python/.NET
 - Binário de release minúsculo (~3,5 MB), inicialização rápida, pouca memória
-- Sem telemetria, sem conta, sem necessidade de internet
+- Sem telemetria, sem conta — funciona 100% offline (a única chamada de rede é
+  uma verificação de atualização opcional e silenciosa)
+
+## Download
+
+Binários prontos para **Windows, Linux e macOS** são anexados a cada
+[release](https://github.com/junglivre/TypeBridge/releases) (gerados
+automaticamente pelo GitHub Actions). Ou compile do código — veja
+[Compilando](#compilando).
 
 ---
 
@@ -31,6 +39,9 @@ transferência.
   Desligue para injeção Unicode (ex.: caracteres especiais em apps locais).
 - **Interface multilíngue** — Inglês, Português (BR) e Español, trocável em
   tempo de execução.
+- **Verificação de atualização embutida** — checa silenciosamente o GitHub por
+  uma versão nova ao iniciar e mostra as notas se houver (sem telemetria; só um
+  ping de versão).
 - **Guarda de foco** *(opcional)* — se a janela em foco mudar durante a
   digitação (uma notificação rouba o foco, você troca de janela sem querer…), a
   digitação **pausa**, a janela vem para a frente (e pisca na barra de tarefas)
@@ -169,6 +180,8 @@ coisa bem: digitar texto na janela em foco.
 ## Licença
 
 Licença dupla: MIT ou Apache-2.0.
+
+Feito por [jung](https://jung.moe).
 
 [egui]: https://github.com/emilk/egui
 [eframe]: https://crates.io/crates/eframe

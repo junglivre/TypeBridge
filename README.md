@@ -14,7 +14,14 @@ the clipboard.
 
 - Native (Rust + [egui]/[eframe]), no Electron/Java/Python/.NET runtime
 - Tiny release binary (~3.5 MB), fast startup, low memory
-- No telemetry, no account, no internet required
+- No telemetry, no account — works fully offline (the only network call is an
+  optional, silent update check)
+
+## Download
+
+Prebuilt binaries for **Windows, Linux and macOS** are attached to every
+[release](https://github.com/junglivre/TypeBridge/releases) (built automatically
+by GitHub Actions). Or build from source — see [Building](#building).
 
 ---
 
@@ -31,6 +38,8 @@ the clipboard.
   for Unicode injection (e.g. special characters in local apps).
 - **Multi-language UI** — English, Português (BR) and Español, switchable at
   runtime.
+- **Built-in update check** — silently checks GitHub for a newer release on
+  startup and shows its notes if one exists (no telemetry; just a version ping).
 - **Focus guard** *(optional)* — if the focused window changes mid-typing (a
   notification steals focus, you alt-tab by accident…), typing **pauses**, the
   window pops to the front (and flashes in the taskbar), and a prominent modal
@@ -161,6 +170,8 @@ window.
 ## License
 
 Dual-licensed under MIT or Apache-2.0.
+
+Made by [jung](https://jung.moe).
 
 [egui]: https://github.com/emilk/egui
 [eframe]: https://crates.io/crates/eframe

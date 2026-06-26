@@ -84,6 +84,13 @@ pub struct Strings {
     pub window_changed_msg: &'static str,
     pub continue_btn: &'static str,
     pub restart_btn: &'static str,
+    pub check_now: &'static str,
+    pub checking: &'static str,
+    pub no_new_version: &'static str,
+    pub update_available: &'static str,
+    pub check_failed: &'static str,
+    pub whats_new: &'static str,
+    pub view_release: &'static str,
 }
 
 static EN: Strings = Strings {
@@ -129,6 +136,13 @@ static EN: Strings = Strings {
          or restart to reconfigure.",
     continue_btn: "Continue",
     restart_btn: "Restart",
+    check_now: "Check now",
+    checking: "Checking for updates…",
+    no_new_version: "No new version",
+    update_available: "New version found:",
+    check_failed: "Couldn't check for updates",
+    whats_new: "What's new",
+    view_release: "View on GitHub",
 };
 
 static PT_BR: Strings = Strings {
@@ -174,6 +188,13 @@ static PT_BR: Strings = Strings {
          ou recomece para reconfigurar.",
     continue_btn: "Continuar",
     restart_btn: "Recomeçar",
+    check_now: "Verificar agora",
+    checking: "Verificando…",
+    no_new_version: "Nenhuma nova versão",
+    update_available: "Nova versão encontrada:",
+    check_failed: "Não foi possível consultar atualizações",
+    whats_new: "Novidades",
+    view_release: "Ver no GitHub",
 };
 
 static ES: Strings = Strings {
@@ -219,4 +240,11 @@ static ES: Strings = Strings {
          o reinicia para reconfigurar.",
     continue_btn: "Continuar",
     restart_btn: "Reiniciar",
+    check_now: "Buscar ahora",
+    checking: "Buscando…",
+    no_new_version: "No hay versión nueva",
+    update_available: "Nueva versión encontrada:",
+    check_failed: "No se pudo buscar actualizaciones",
+    whats_new: "Novedades",
+    view_release: "Ver en GitHub",
 };

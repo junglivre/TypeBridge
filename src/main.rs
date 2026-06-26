@@ -12,6 +12,7 @@ mod i18n;
 mod settings;
 mod typing;
 mod ui;
+mod update;
 
 use eframe::egui;
 

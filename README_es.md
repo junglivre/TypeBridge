@@ -13,7 +13,15 @@ compartido.
 
 - Nativa (Rust + [egui]/[eframe]), sin runtime de Electron/Java/Python/.NET
 - Binario de release diminuto (~3,5 MB), arranque rápido, poca memoria
-- Sin telemetría, sin cuenta, sin necesidad de internet
+- Sin telemetría, sin cuenta — funciona 100% sin conexión (la única llamada de
+  red es una comprobación de actualización opcional y silenciosa)
+
+## Descarga
+
+Hay binarios listos para **Windows, Linux y macOS** adjuntos en cada
+[release](https://github.com/junglivre/TypeBridge/releases) (generados
+automáticamente por GitHub Actions). O compila desde el código — ve
+[Compilación](#compilación).
 
 ---
 
@@ -31,6 +39,9 @@ compartido.
   locales).
 - **Interfaz multilingüe** — Inglés, Português (BR) y Español, conmutable en
   tiempo de ejecución.
+- **Comprobación de actualización integrada** — consulta silenciosamente GitHub
+  por una versión nueva al iniciar y muestra sus notas si existe (sin
+  telemetría; solo un ping de versión).
 - **Guardia de foco** *(opcional)* — si la ventana enfocada cambia durante la
   escritura (una notificación roba el foco, cambias de ventana sin querer…), la
   escritura se **pausa**, la ventana pasa al frente (y parpadea en la barra de
@@ -168,6 +179,8 @@ cosa bien: escribir texto en la ventana enfocada.
 ## Licencia
 
 Licencia dual: MIT o Apache-2.0.
+
+Hecho por [jung](https://jung.moe).
 
 [egui]: https://github.com/emilk/egui
 [eframe]: https://crates.io/crates/eframe

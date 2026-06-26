@@ -12,6 +12,7 @@ use crate::settings::config::Config;
 use crate::typing::engine::KeyMode;
 use crate::typing::window;
 use crate::typing::worker::{self, JobConfig, TypingJob, WorkerMsg};
+use crate::update::{self, UpdateState};
 use crate::CliArgs;
 
 use super::widgets;
@@ -38,6 +39,10 @@ pub struct TypeBridgeApp {
     lang: Lang,
 
     // --- runtime state ---
+    update_state: update::SharedState,
+    /// Whether the last update check was started by the user (controls whether
+    /// "no new version" / "couldn't check" feedback is shown).
+    update_manual: bool,
     phase: Phase,
     error_msg: Option<String>,
     typed: usize,
@@ -64,6 +69,8 @@ impl TypeBridgeApp {
             detect_window_change: cfg.detect_window_change,
             key_mode: cfg.key_mode,
             lang: cfg.language,
+            update_state: update::shared(),
+            update_manual: false,
             phase: Phase::Idle,
             error_msg: None,
             typed: 0,
@@ -87,6 +94,14 @@ impl TypeBridgeApp {
             app.text = text;
         }
         app.autostart_pending = cli.autostart && !app.text.trim().is_empty();
+
+        // Always check for updates on startup, silently in the background — it
+        // never blocks the UI and only surfaces a result if a newer version
+        // exists (or when the user clicks "Check now").
+        {
+            let ctx = cc.egui_ctx.clone();
+            update::spawn_check(app.update_state.clone(), move || ctx.request_repaint());
+        }
 
         app
     }
@@ -440,6 +455,72 @@ impl TypeBridgeApp {
 
         if let Some(err) = &self.error_msg {
             ui.colored_label(Color32::from_rgb(225, 110, 110), err);
+        }
+
+        self.footer(ui, ctx);
+    }
+
+    /// Version, repository link, author credit and update-check status.
+    fn footer(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
+        let s = self.lang.s();
+        let state = self.update_state.lock().unwrap().clone();
+        let manual = self.update_manual;
+
+        ui.add_space(6.0);
+        ui.separator();
+
+        // Version · repository · author.
+        ui.horizontal(|ui| {
+            ui.label(egui::RichText::new(format!("v{}", update::VERSION)).weak());
+            ui.hyperlink_to("GitHub ↗", update::REPO_URL);
+            ui.label(egui::RichText::new("·").weak());
+            ui.hyperlink_to("© jung ↗", "https://jung.moe");
+        });
+
+        // Manual re-check, with verbose feedback for any outcome.
+        ui.horizontal(|ui| {
+            if ui.small_button(s.check_now).clicked() {
+                self.update_manual = true;
+                let c = ctx.clone();
+                update::spawn_check(self.update_state.clone(), move || c.request_repaint());
+            }
+            if manual {
+                match &state {
+                    UpdateState::Checking => {
+                        ui.label(egui::RichText::new(s.checking).weak());
+                    }
+                    UpdateState::UpToDate => {
+                        ui.label(egui::RichText::new(s.no_new_version).weak());
+                    }
+                    UpdateState::Failed => {
+                        ui.colored_label(Color32::from_rgb(210, 150, 70), s.check_failed);
+                    }
+                    _ => {}
+                }
+            }
+        });
+
+        // A newer version is always surfaced (whether the check was auto or
+        // manual); "up to date" / errors stay silent unless the user asked.
+        if let UpdateState::Available(rel) = &state {
+            ui.horizontal(|ui| {
+                ui.label(
+                    egui::RichText::new(format!("⬆ {} {}", s.update_available, rel.tag))
+                        .strong()
+                        .color(Color32::from_rgb(230, 170, 60)),
+                );
+                ui.hyperlink_to(format!("{} ↗", s.view_release), &rel.url);
+            });
+            if !rel.notes.trim().is_empty() {
+                egui::CollapsingHeader::new(format!("{} — {}", s.whats_new, rel.tag)).show(
+                    ui,
+                    |ui| {
+                        egui::ScrollArea::vertical().max_height(160.0).show(ui, |ui| {
+                            ui.label(rel.notes.clone());
+                        });
+                    },
+                );
+            }
         }
     }
 

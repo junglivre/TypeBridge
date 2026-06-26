@@ -1,9 +1,10 @@
 [package]
 name = "typebridge"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2021"
 description = "Types arbitrary text into the currently focused window (VNC, KVM, consoles, BIOS/IPMI)."
 license = "MIT OR Apache-2.0"
+repository = "https://github.com/junglivre/TypeBridge"
 
 [dependencies]
 eframe = "0.31"
@@ -13,6 +14,7 @@ arboard = "3"
 serde = { version = "1", features = ["derive"] }
 confy = "0.6"
 device_query = "2"
+ureq = { version = "2", default-features = false, features = ["native-tls", "json"] }
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.59", features = [
