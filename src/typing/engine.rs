@@ -125,34 +125,16 @@ impl Typer {
     /// modifiers a real keyboard would use, so remote clients see proper input.
     #[cfg(windows)]
     fn send_physical(&mut self, ch: char) -> Result<(), TypeError> {
-        use windows_sys::Win32::UI::Input::KeyboardAndMouse::{GetKeyboardLayout, VkKeyScanExW};
-        use windows_sys::Win32::UI::WindowsAndMessaging::{
-            GetForegroundWindow, GetWindowThreadProcessId,
+        // Fall back to Unicode injection for characters we can't reach with a
+        // single physical key on the target's layout (dead-key combos, etc.).
+        let Some(plan) = resolve_key(ch) else {
+            return self.send_unicode(ch);
         };
 
-        // Characters outside the BMP can't be expressed as a single VK.
-        if (ch as u32) > 0xFFFF {
-            return self.send_unicode(ch);
-        }
-
-        // Map the character to a virtual key + modifier state on the target
-        // window's keyboard layout.
-        let scan = unsafe {
-            let hwnd = GetForegroundWindow();
-            let tid = GetWindowThreadProcessId(hwnd, std::ptr::null_mut());
-            let layout = GetKeyboardLayout(tid);
-            VkKeyScanExW(ch as u16, layout)
-        };
-        if scan == -1 {
-            // Not reachable on this layout (e.g. a dead-key combo): fall back.
-            return self.send_unicode(ch);
-        }
-
-        let hi = ((scan as u16) >> 8) & 0xFF;
         let mods = [
-            (hi & 1 != 0, Key::Shift),
-            (hi & 2 != 0, Key::Control),
-            (hi & 4 != 0, Key::Alt),
+            (plan.shift, Key::Shift),
+            (plan.ctrl, Key::Control),
+            (plan.alt, Key::Alt),
         ];
 
         for (needed, key) in mods {
@@ -160,11 +142,12 @@ impl Typer {
                 self.hold(key, Direction::Press)?;
             }
         }
-        // The base key: enigo emits the layout's scancode for `ch` (without the
-        // modifiers), which combined with the ones we hold yields `ch`.
+        // Send the base key by scancode (this avoids enigo's Key::Unicode path,
+        // which mis-handles shifted characters). Combined with the modifiers we
+        // hold, this yields `ch`.
         let result = self
             .enigo
-            .key(Key::Unicode(ch), Direction::Click)
+            .raw(plan.scancode, Direction::Click)
             .map_err(|e| TypeError::Inject(e.to_string()));
         for (needed, key) in mods.into_iter().rev() {
             if needed {
@@ -180,6 +163,62 @@ impl Typer {
             .key(key, dir)
             .map_err(|e| TypeError::Inject(e.to_string()))
     }
+}
+
+/// A resolved physical-key plan for a character on the active layout.
+#[cfg(windows)]
+struct KeyPlan {
+    scancode: u16,
+    shift: bool,
+    ctrl: bool,
+    alt: bool,
+}
+
+/// Resolve a character to a base scancode + the modifiers needed to produce it
+/// on the target window's keyboard layout. Returns `None` when the character
+/// isn't reachable with a single physical key (the caller falls back to Unicode).
+#[cfg(windows)]
+fn resolve_key(ch: char) -> Option<KeyPlan> {
+    use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
+        GetKeyboardLayout, MapVirtualKeyExW, VkKeyScanExW, MAPVK_VK_TO_VSC,
+    };
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        GetForegroundWindow, GetWindowThreadProcessId,
+    };
+
+    // Characters outside the BMP can't be expressed as a single VK.
+    if (ch as u32) > 0xFFFF {
+        return None;
+    }
+
+    // Map the character to a virtual key + shift state on the target window's
+    // layout: low byte = virtual key, high byte = shift state.
+    let (vk_scan, layout) = unsafe {
+        let hwnd = GetForegroundWindow();
+        let tid = GetWindowThreadProcessId(hwnd, std::ptr::null_mut());
+        let layout = GetKeyboardLayout(tid);
+        (VkKeyScanExW(ch as u16, layout), layout)
+    };
+    if vk_scan == -1 {
+        return None;
+    }
+
+    let vk = (vk_scan as u16) & 0x00FF; // mask off the shift state
+    let shift_state = ((vk_scan as u16) >> 8) & 0xFF;
+
+    // Translate the *masked* virtual key to its scancode. Passing the unmasked
+    // value (with the shift bits) yields scancode 0 — a dropped keystroke.
+    let scancode = unsafe { MapVirtualKeyExW(vk as u32, MAPVK_VK_TO_VSC, layout) } as u16;
+    if scancode == 0 {
+        return None;
+    }
+
+    Some(KeyPlan {
+        scancode,
+        shift: shift_state & 1 != 0,
+        ctrl: shift_state & 2 != 0,
+        alt: shift_state & 4 != 0,
+    })
 }
 
 #[cfg(test)]
@@ -201,5 +240,23 @@ mod tests {
         assert_eq!(classify(' '), CharAction::Char(' '));
         assert_eq!(classify('é'), CharAction::Char('é'));
         assert_eq!(classify('🚀'), CharAction::Char('🚀'));
+    }
+
+    /// Regression: enigo's `Key::Unicode` path produced scancode 0 for shifted
+    /// characters, so `#`, capitals and `!` were dropped by VNC clients.
+    /// `resolve_key` must return a real scancode and flag Shift.
+    #[cfg(windows)]
+    #[test]
+    fn shifted_chars_get_a_real_scancode() {
+        let upper = resolve_key('A').expect("'A' should map to a key");
+        assert!(upper.shift, "'A' requires Shift");
+        assert_ne!(upper.scancode, 0, "'A' must have a real scancode");
+
+        let lower = resolve_key('a').expect("'a' should map to a key");
+        assert!(!lower.shift, "'a' needs no Shift");
+        assert_ne!(lower.scancode, 0);
+
+        // Upper- and lower-case of the same letter share the physical key.
+        assert_eq!(upper.scancode, lower.scancode);
     }
 }
