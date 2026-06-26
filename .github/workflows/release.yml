@@ -1,18 +1,55 @@
 name: Release
 
-# Push a version tag (e.g. v1.0.0) to build all platforms and publish a
-# GitHub Release with the binaries attached.
+# Push a version tag (e.g. 1.0.0 — no leading "v") to build every platform and
+# publish a GitHub Release with a commit-based changelog and the binaries.
 on:
   push:
     tags:
-      - "v*"
+      - "[0-9]+.[0-9]+.[0-9]+"
 
 permissions:
   contents: write
 
 jobs:
+  create-release:
+    name: Create release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history so we can build a changelog
+
+      - name: Build changelog
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          PREV="$(git describe --tags --abbrev=0 "${TAG}^" 2>/dev/null || echo "")"
+          {
+            echo "## Changelog"
+            echo ""
+            if [ -n "$PREV" ]; then
+              git log "${PREV}..${TAG}" --no-merges --pretty=format:'- %s'
+            else
+              git log "${TAG}" --no-merges --pretty=format:'- %s'
+            fi
+            echo ""
+          } > NOTES.md
+          echo "----- notes -----"; cat NOTES.md
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --title "${GITHUB_REF_NAME}" \
+            --notes-file NOTES.md \
+            --latest \
+            --verify-tag
+
   build:
-    name: ${{ matrix.asset }}
+    name: ${{ matrix.label }}
+    needs: create-release
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -21,19 +58,33 @@ jobs:
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             bin: typebridge.exe
-            asset: typebridge-windows-x86_64.exe
+            label: windows-x86_64
+            ext: .exe
+          - os: windows-11-arm
+            target: aarch64-pc-windows-msvc
+            bin: typebridge.exe
+            label: windows-arm64
+            ext: .exe
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             bin: typebridge
-            asset: typebridge-linux-x86_64
+            label: linux-x86_64
+            ext: ""
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            bin: typebridge
+            label: linux-arm64
+            ext: ""
           - os: macos-latest
             target: aarch64-apple-darwin
             bin: typebridge
-            asset: typebridge-macos-aarch64
+            label: macos-arm64
+            ext: ""
           - os: macos-latest
             target: x86_64-apple-darwin
             bin: typebridge
-            asset: typebridge-macos-x86_64
+            label: macos-x86_64
+            ext: ""
 
     steps:
       - uses: actions/checkout@v4
@@ -62,10 +113,13 @@ jobs:
 
       - name: Stage artifact
         shell: bash
-        run: cp "target/${{ matrix.target }}/release/${{ matrix.bin }}" "${{ matrix.asset }}"
+        run: |
+          ASSET="typebridge-${GITHUB_REF_NAME}-${{ matrix.label }}${{ matrix.ext }}"
+          cp "target/${{ matrix.target }}/release/${{ matrix.bin }}" "$ASSET"
+          echo "ASSET=$ASSET" >> "$GITHUB_ENV"
 
-      - name: Publish to release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: ${{ matrix.asset }}
-          generate_release_notes: true
+      - name: Upload to release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${GITHUB_REF_NAME}" "$ASSET" --repo "${GITHUB_REPOSITORY}" --clobber
