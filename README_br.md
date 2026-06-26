@@ -25,6 +25,10 @@ transferência.
 - **Atraso por tecla configurável** (1–2000 ms) e **atraso inicial** (tempo para
   trocar para a janela de destino).
 - **Predefinições de velocidade** (Muito rápido → Muito lento).
+- **Modo de teclas físicas** *(padrão)* — digita com pressionamentos reais e os
+  modificadores `Shift`/`Ctrl`/`Alt` corretos, então `#`, letras maiúsculas e
+  símbolos chegam certos em **VNC/RDP/KVM e consoles web** (noVNC, Guacamole…).
+  Desligue para injeção Unicode (ex.: caracteres especiais em apps locais).
 - **Interface multilíngue** — Inglês, Português (BR) e Español, trocável em
   tempo de execução.
 - **Guarda de foco** *(opcional)* — se a janela em foco mudar durante a
@@ -41,7 +45,8 @@ transferência.
 - **Status ao vivo** (`Pronto` / `Aguardando…` / `Digitando…` / `Pausado` /
   `Concluído` / `Cancelado`) com barra de progresso.
 - **Persistência das configurações** (atraso, atraso inicial, minimizar, guarda
-  de foco, idioma, tamanho da janela) com **modo portátil** como alternativa.
+  de foco, modo de digitação, idioma, tamanho da janela) com **modo portátil**
+  como alternativa.
 - **Thread de digitação em segundo plano** — a interface nunca trava.
 - **CLI mínima** para pré-carregar texto/parâmetros.
 

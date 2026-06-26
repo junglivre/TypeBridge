@@ -25,6 +25,10 @@ the clipboard.
 - **Configurable per-key delay** (1–2000 ms) and **initial delay** (time to
   switch to the target window).
 - **Typing speed presets** (Very fast → Very slow).
+- **Physical-key mode** *(default)* — types with real key presses and the right
+  `Shift`/`Ctrl`/`Alt` modifiers, so `#`, capital letters and symbols arrive
+  correctly in **VNC/RDP/KVM and web consoles** (noVNC, Guacamole…). Turn it off
+  for Unicode injection (e.g. special characters in local apps).
 - **Multi-language UI** — English, Português (BR) and Español, switchable at
   runtime.
 - **Focus guard** *(optional)* — if the focused window changes mid-typing (a
@@ -39,7 +43,7 @@ the clipboard.
 - **Live status** (`Ready` / `Waiting…` / `Typing…` / `Paused` / `Finished` /
   `Cancelled`) with a progress bar.
 - **Settings persistence** (delay, initial delay, minimize, focus guard,
-  language, window size) with a **portable mode** fallback.
+  keystroke mode, language, window size) with a **portable mode** fallback.
 - **Background typing thread** — the UI never freezes.
 - **Minimal CLI** for preloading text/parameters.
 

@@ -38,6 +38,7 @@ pub struct JobConfig {
     pub delay_ms: u32,
     pub initial_delay_s: u32,
     pub detect_window_change: bool,
+    pub physical_keys: bool,
 }
 
 /// Handle to a running typing job.
@@ -90,7 +91,7 @@ fn run_job(
         return;
     }
 
-    let mut typer = match Typer::new() {
+    let mut typer = match Typer::new(cfg.physical_keys) {
         Ok(t) => t,
         Err(e) => {
             let _ = tx.send(WorkerMsg::Error(e.to_string()));

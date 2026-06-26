@@ -24,6 +24,11 @@ compartido.
 - **Retardo por tecla configurable** (1–2000 ms) y **retardo inicial** (tiempo
   para cambiar a la ventana de destino).
 - **Preajustes de velocidad** (Muy rápido → Muy lento).
+- **Modo de teclas físicas** *(predeterminado)* — escribe con pulsaciones reales
+  y los modificadores `Shift`/`Ctrl`/`Alt` correctos, para que `#`, mayúsculas y
+  símbolos lleguen bien en **VNC/RDP/KVM y consolas web** (noVNC, Guacamole…).
+  Desactívalo para inyección Unicode (p. ej. caracteres especiales en apps
+  locales).
 - **Interfaz multilingüe** — Inglés, Português (BR) y Español, conmutable en
   tiempo de ejecución.
 - **Guardia de foco** *(opcional)* — si la ventana enfocada cambia durante la
@@ -39,7 +44,8 @@ compartido.
 - **Estado en vivo** (`Listo` / `Esperando…` / `Escribiendo…` / `Pausado` /
   `Finalizado` / `Cancelado`) con barra de progreso.
 - **Persistencia de ajustes** (retardo, retardo inicial, minimizar, guardia de
-  foco, idioma, tamaño de ventana) con **modo portátil** como alternativa.
+  foco, modo de escritura, idioma, tamaño de ventana) con **modo portátil** como
+  alternativa.
 - **Hilo de escritura en segundo plano** — la interfaz nunca se congela.
 - **CLI mínima** para precargar texto/parámetros.
 
