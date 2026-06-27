@@ -43,6 +43,11 @@ pub struct TypeBridgeApp {
     /// Whether the last update check was started by the user (controls whether
     /// "no new version" / "couldn't check" feedback is shown).
     update_manual: bool,
+    /// Set once the user dismisses (or acts on) the update modal, so it isn't
+    /// shown again this session.
+    update_dismissed: bool,
+    /// Render cache for the Markdown changelog in the update modal.
+    md_cache: egui_commonmark::CommonMarkCache,
     /// Linux-only startup notice about input limitations (dismissible).
     show_linux_notice: bool,
     phase: Phase,
@@ -73,6 +78,8 @@ impl TypeBridgeApp {
             lang: cfg.language,
             update_state: update::shared(),
             update_manual: false,
+            update_dismissed: false,
+            md_cache: egui_commonmark::CommonMarkCache::default(),
             show_linux_notice: cfg!(target_os = "linux"),
             phase: Phase::Idle,
             error_msg: None,
@@ -487,46 +494,114 @@ impl TypeBridgeApp {
         ui.horizontal(|ui| {
             if ui.small_button(s.check_now).clicked() {
                 self.update_manual = true;
+                // Re-arm the modal so a freshly-found update surfaces again.
+                self.update_dismissed = false;
                 let c = ctx.clone();
                 update::spawn_check(self.update_state.clone(), move || c.request_repaint());
             }
-            if manual {
-                match &state {
-                    UpdateState::Checking => {
-                        ui.label(egui::RichText::new(s.checking).weak());
-                    }
-                    UpdateState::UpToDate => {
-                        ui.label(egui::RichText::new(s.no_new_version).weak());
-                    }
-                    UpdateState::Failed => {
-                        ui.colored_label(Color32::from_rgb(210, 150, 70), s.check_failed);
-                    }
-                    _ => {}
+            match &state {
+                UpdateState::Checking if manual => {
+                    ui.label(egui::RichText::new(s.checking).weak());
                 }
+                UpdateState::UpToDate if manual => {
+                    ui.label(egui::RichText::new(s.no_new_version).weak());
+                }
+                UpdateState::Failed if manual => {
+                    ui.colored_label(Color32::from_rgb(210, 150, 70), s.check_failed);
+                }
+                // A newer version stays reachable here even after the modal is
+                // dismissed, but the modal itself is the primary surface.
+                UpdateState::Available(rel) if self.update_dismissed => {
+                    ui.label(
+                        egui::RichText::new(format!("⬆ {}", rel.tag))
+                            .strong()
+                            .color(Color32::from_rgb(90, 200, 120)),
+                    );
+                    ui.hyperlink_to(format!("{} ↗", s.view_release), &rel.url);
+                }
+                _ => {}
             }
         });
+    }
 
-        // A newer version is always surfaced (whether the check was auto or
-        // manual); "up to date" / errors stay silent unless the user asked.
-        if let UpdateState::Available(rel) = &state {
-            ui.horizontal(|ui| {
+    /// A prominent startup modal shown when a newer release exists, with the
+    /// changelog rendered as Markdown and download / dismiss actions.
+    fn update_modal(&mut self, ctx: &egui::Context) {
+        let s = self.lang.s();
+        let rel = match self.update_state.lock().unwrap().clone() {
+            UpdateState::Available(r) => r,
+            _ => return,
+        };
+
+        let mut download = false;
+        let mut dismiss = false;
+        egui::Modal::new(egui::Id::new("update_modal")).show(ctx, |ui| {
+            ui.set_width(470.0);
+            ui.vertical_centered(|ui| {
+                widgets::update_icon(ui, 50.0);
+                ui.add_space(6.0);
+                ui.label(egui::RichText::new(s.update_available).size(15.0).weak());
                 ui.label(
-                    egui::RichText::new(format!("⬆ {} {}", s.update_available, rel.tag))
+                    egui::RichText::new(&rel.tag)
+                        .size(23.0)
                         .strong()
-                        .color(Color32::from_rgb(230, 170, 60)),
+                        .color(Color32::from_rgb(90, 200, 120)),
                 );
-                ui.hyperlink_to(format!("{} ↗", s.view_release), &rel.url);
             });
-            if !rel.notes.trim().is_empty() {
-                egui::CollapsingHeader::new(format!("{} — {}", s.whats_new, rel.tag)).show(
-                    ui,
-                    |ui| {
-                        egui::ScrollArea::vertical().max_height(160.0).show(ui, |ui| {
-                            ui.label(rel.notes.clone());
+
+            ui.add_space(12.0);
+            ui.label(egui::RichText::new(s.whats_new).strong());
+            ui.add_space(4.0);
+
+            // Changelog block, rendered as Markdown.
+            egui::Frame::group(ui.style())
+                .fill(ui.visuals().extreme_bg_color)
+                .show(ui, |ui| {
+                    egui::ScrollArea::vertical()
+                        .max_height(260.0)
+                        .auto_shrink([false, false])
+                        .show(ui, |ui| {
+                            if rel.notes.trim().is_empty() {
+                                ui.label(egui::RichText::new("—").weak());
+                            } else {
+                                egui_commonmark::CommonMarkViewer::new().show(
+                                    ui,
+                                    &mut self.md_cache,
+                                    &rel.notes,
+                                );
+                            }
                         });
-                    },
-                );
-            }
+                });
+
+            ui.add_space(14.0);
+            ui.horizontal(|ui| {
+                let w = (ui.available_width() - 8.0) / 2.0;
+                if ui
+                    .add_sized(
+                        [w, 36.0],
+                        egui::Button::new(
+                            egui::RichText::new(format!("⬇  {}", s.download_update)).strong(),
+                        ),
+                    )
+                    .clicked()
+                {
+                    download = true;
+                }
+                if ui
+                    .add_sized([w, 36.0], egui::Button::new(s.dismiss))
+                    .clicked()
+                {
+                    dismiss = true;
+                }
+            });
+        });
+
+        if download {
+            ctx.open_url(egui::OpenUrl::new_tab(rel.url));
+            self.update_dismissed = true;
+        }
+        if dismiss {
+            self.update_dismissed = true;
         }
     }
 
@@ -651,6 +726,16 @@ impl eframe::App for TypeBridgeApp {
         // One-time Linux input-limitations notice on startup.
         if self.show_linux_notice {
             self.linux_notice_modal(ctx);
+        }
+
+        // A newer release surfaces as a prominent modal (once per session), but
+        // never stacked on top of another modal.
+        if !self.show_linux_notice
+            && self.phase != Phase::Paused
+            && !self.update_dismissed
+            && matches!(*self.update_state.lock().unwrap(), UpdateState::Available(_))
+        {
+            self.update_modal(ctx);
         }
 
         // A focus change while typing surfaces a prominent modal.

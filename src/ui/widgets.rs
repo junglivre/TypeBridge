@@ -38,3 +38,24 @@ pub fn warning_icon(ui: &mut Ui, size: f32) {
         Color32::WHITE,
     );
 }
+
+/// A green circle with an upward arrow — the "update available" badge. Painted
+/// by hand so it renders without an emoji font.
+pub fn update_icon(ui: &mut Ui, size: f32) {
+    let (rect, _) = ui.allocate_exact_size(Vec2::splat(size), Sense::hover());
+    let c = rect.center();
+    let r = size * 0.46;
+
+    let fill = Color32::from_rgb(60, 180, 95);
+    let edge = Color32::from_rgb(28, 110, 55);
+    let painter = ui.painter();
+    painter.circle(c, r, fill, Stroke::new(2.0, edge));
+
+    // Up arrow: a vertical stem plus a chevron head, in white.
+    let w = Stroke::new(size * 0.085, Color32::WHITE);
+    let top = egui::pos2(c.x, c.y - r * 0.5);
+    let bottom = egui::pos2(c.x, c.y + r * 0.5);
+    painter.line_segment([top, bottom], w);
+    painter.line_segment([top, egui::pos2(c.x - r * 0.42, c.y - r * 0.04)], w);
+    painter.line_segment([top, egui::pos2(c.x + r * 0.42, c.y - r * 0.04)], w);
+}

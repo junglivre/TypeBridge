@@ -95,6 +95,8 @@ pub struct Strings {
     pub linux_notice_title: &'static str,
     pub linux_notice_msg: &'static str,
     pub ok_btn: &'static str,
+    pub download_update: &'static str,
+    pub dismiss: &'static str,
 }
 
 static EN: Strings = Strings {
@@ -151,6 +153,8 @@ static EN: Strings = Strings {
     linux_notice_title: "Heads up on Linux",
     linux_notice_msg: "Keyboard injection on Linux can be unstable depending on your desktop environment — especially on Wayland, where it may not reach apps. An X11 session is the most reliable.",
     ok_btn: "Got it",
+    download_update: "Download",
+    dismiss: "Dismiss",
 };
 
 static PT_BR: Strings = Strings {
@@ -207,6 +211,8 @@ static PT_BR: Strings = Strings {
     linux_notice_title: "Atenção no Linux",
     linux_notice_msg: "A injeção de teclado no Linux pode ser instável dependendo do seu ambiente de desktop — especialmente no Wayland, onde pode não alcançar os apps. Uma sessão X11 é a mais confiável.",
     ok_btn: "Entendi",
+    download_update: "Baixar",
+    dismiss: "Dispensar",
 };
 
 static ES: Strings = Strings {
@@ -263,4 +269,6 @@ static ES: Strings = Strings {
     linux_notice_title: "Aviso en Linux",
     linux_notice_msg: "La inyección de teclado en Linux puede ser inestable según tu entorno de escritorio — especialmente en Wayland, donde puede no llegar a las apps. Una sesión X11 es la más fiable.",
     ok_btn: "Entendido",
+    download_update: "Descargar",
+    dismiss: "Descartar",
 };
