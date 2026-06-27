@@ -149,7 +149,7 @@ static EN: Strings = Strings {
     view_release: "View on GitHub",
     minimize_linux_warn: "On Linux the window may not come back after typing (a desktop restriction, on both X11 and Wayland).",
     linux_notice_title: "Heads up on Linux",
-    linux_notice_msg: "Keyboard injection on Linux can be unstable depending on your desktop environment. On Wayland the system will ask for permission to type — when the app starts and again on the first keystroke.",
+    linux_notice_msg: "Keyboard injection on Linux can be unstable depending on your desktop environment — especially on Wayland, where it may not reach apps. An X11 session is the most reliable.",
     ok_btn: "Got it",
 };
 
@@ -205,7 +205,7 @@ static PT_BR: Strings = Strings {
     view_release: "Ver no GitHub",
     minimize_linux_warn: "No Linux a janela pode não voltar após digitar (restrição do desktop, tanto no X11 quanto no Wayland).",
     linux_notice_title: "Atenção no Linux",
-    linux_notice_msg: "A injeção de teclado no Linux pode ser instável dependendo do seu ambiente de desktop. No Wayland o sistema vai pedir permissão para digitar — ao abrir o app e novamente na primeira digitação.",
+    linux_notice_msg: "A injeção de teclado no Linux pode ser instável dependendo do seu ambiente de desktop — especialmente no Wayland, onde pode não alcançar os apps. Uma sessão X11 é a mais confiável.",
     ok_btn: "Entendi",
 };
 
@@ -261,6 +261,6 @@ static ES: Strings = Strings {
     view_release: "Ver en GitHub",
     minimize_linux_warn: "En Linux la ventana puede no volver tras escribir (una restricción del escritorio, tanto en X11 como en Wayland).",
     linux_notice_title: "Aviso en Linux",
-    linux_notice_msg: "La inyección de teclado en Linux puede ser inestable según tu entorno de escritorio. En Wayland el sistema pedirá permiso para escribir — al abrir la app y de nuevo en la primera pulsación.",
+    linux_notice_msg: "La inyección de teclado en Linux puede ser inestable según tu entorno de escritorio — especialmente en Wayland, donde puede no llegar a las apps. Una sesión X11 es la más fiable.",
     ok_btn: "Entendido",
 };

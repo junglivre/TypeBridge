@@ -147,9 +147,10 @@ Hay dos toolchains en Windows:
 ## Notas por plataforma
 
 - **Windows** — funciona de inmediato.
-- **Linux** — X11 es compatible; en sesiones Wayland restringidas la inyección
-  de teclas puede no funcionar (verás un mensaje amigable). Dependencias de
-  build: un entorno de desarrollo X11.
+- **Linux** — X11 es totalmente compatible. **Wayland aún no es compatible** (las
+  teclas no llegan a las apps) — usa una sesión X11 por ahora; estamos
+  trabajando en ello. Dependencias de build: paquetes dev de X11/xcb +
+  xkbcommon + OpenSSL.
 - **macOS** — concede el permiso de Accesibilidad en *Ajustes del Sistema →
   Privacidad y Seguridad → Accesibilidad*; la app muestra un mensaje claro si
   falta.

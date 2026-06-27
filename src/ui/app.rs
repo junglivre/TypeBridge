@@ -381,8 +381,8 @@ impl TypeBridgeApp {
         {
             self.save_config(ctx);
         }
-        if cfg!(target_os = "linux") {
-            ui.label(egui::RichText::new(s.minimize_linux_warn).weak());
+        if cfg!(target_os = "linux") && self.minimize {
+            ui.colored_label(Color32::from_rgb(240, 210, 70), s.minimize_linux_warn);
         }
         ui.horizontal(|ui| {
             let resp = ui.add_enabled(

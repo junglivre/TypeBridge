@@ -139,9 +139,9 @@ There are two Windows toolchains:
 ## Platform notes
 
 - **Windows** — works out of the box.
-- **Linux** — X11 is supported; under restricted Wayland sessions key injection
-  may not work (you'll get a friendly error). Build deps: an X11 dev
-  environment.
+- **Linux** — X11 is fully supported. **Wayland is not supported yet**
+  (keystrokes don't reach apps) — use an X11 session for now; we're working on
+  it. Build deps: X11/xcb + xkbcommon + OpenSSL dev packages.
 - **macOS** — grant Accessibility permission under *System Settings → Privacy &
   Security → Accessibility*; the app reports a clear message if it's missing.
 

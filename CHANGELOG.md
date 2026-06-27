@@ -4,17 +4,23 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and the project follows
 [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [1.0.2] - 2026-06-26
 
 ### Added
-- Linux: a startup notice explaining that keyboard injection can be unstable
-  depending on the desktop, and that Wayland prompts for permission to type.
-- Linux: a warning under "Minimize window before typing" that the window may not
-  come back, due to desktop restrictions (X11 or Wayland).
+- The UI language now defaults to the system locale on first run (pt-BR / es /
+  en); the user's later choice is remembered.
+- Linux: a startup notice that keyboard injection can be unstable depending on
+  the desktop (most reliable on X11).
+- Linux: a warning under "Minimize window before typing" — shown only when it is
+  enabled — that the window may not come back, due to desktop restrictions.
 
 ### Changed
-- Linux: type via enigo's pure-Rust `x11rb` backend instead of `libxdo`, so
-  there is no `libxdo` dependency at build or runtime (more portable binaries).
+- Linux: type via enigo's pure-Rust `x11rb` backend instead of `libxdo` (no
+  `libxdo` dependency at build or runtime).
+
+### Known limitations
+- Linux/Wayland: keystrokes don't reach apps yet — use an X11 session for now.
+  Native Wayland support is in progress.
 
 ## [1.0.1] - 2026-06-26
 
@@ -45,5 +51,6 @@ All notable changes to this project are documented here. The format is based on
 - GitHub Actions: CI (build/test) and multi-platform release builds
   (Windows/Linux/macOS, x86_64 and ARM64).
 
+[1.0.2]: https://github.com/junglivre/TypeBridge/releases/tag/1.0.2
 [1.0.1]: https://github.com/junglivre/TypeBridge/releases/tag/1.0.1
 [1.0.0]: https://github.com/junglivre/TypeBridge/releases/tag/1.0.0

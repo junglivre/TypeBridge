@@ -59,11 +59,24 @@ fn portable_path() -> Option<PathBuf> {
 
 impl Config {
     /// Load the configuration, falling back to defaults on any error.
+    ///
+    /// On the very first run (no config file yet), the UI language defaults to
+    /// the system locale; the user's later choice is then persisted.
     pub fn load() -> Self {
-        match portable_path() {
-            Some(path) => confy::load_path(path).unwrap_or_default(),
-            None => confy::load(APP_NAME, Some(CONFIG_NAME)).unwrap_or_default(),
+        if let Some(path) = portable_path() {
+            // Portable file already exists (portable_path only returns existing).
+            return confy::load_path(path).unwrap_or_default();
         }
+
+        let first_run = confy::get_configuration_file_path(APP_NAME, Some(CONFIG_NAME))
+            .map(|p| !p.exists())
+            .unwrap_or(false);
+
+        let mut cfg: Config = confy::load(APP_NAME, Some(CONFIG_NAME)).unwrap_or_default();
+        if first_run {
+            cfg.language = detect_system_language();
+        }
+        cfg
     }
 
     /// Persist the configuration. Errors are returned so callers may surface
@@ -73,6 +86,19 @@ impl Config {
             Some(path) => confy::store_path(path, self),
             None => confy::store(APP_NAME, Some(CONFIG_NAME), self),
         }
+    }
+}
+
+/// Map the system locale (e.g. `pt-BR`, `es-ES`) to a supported UI language.
+/// Used only to pick a sensible default on the first run.
+fn detect_system_language() -> Lang {
+    let loc = sys_locale::get_locale().unwrap_or_default().to_lowercase();
+    if loc.starts_with("pt") {
+        Lang::PtBr
+    } else if loc.starts_with("es") {
+        Lang::Es
+    } else {
+        Lang::En
     }
 }
 
