@@ -84,13 +84,9 @@ fn run_job(
     let initial = Duration::from_secs(cfg.initial_delay_s as u64);
     let step = (total / 200).max(1);
 
-    // ---- Initial delay countdown -----------------------------------------
-    if !countdown(initial, &cancel, &esc, &tx, &repaint) {
-        let _ = tx.send(WorkerMsg::Cancelled);
-        repaint();
-        return;
-    }
-
+    // Connect the keyboard backend FIRST. On Wayland (KDE/GNOME) this triggers
+    // the portal permission dialog, which would otherwise steal focus during
+    // the countdown; doing it up front lets the countdown serve its purpose.
     let mut typer = match Typer::new(cfg.key_mode) {
         Ok(t) => t,
         Err(e) => {
@@ -99,6 +95,13 @@ fn run_job(
             return;
         }
     };
+
+    // ---- Initial delay countdown -----------------------------------------
+    if !countdown(initial, &cancel, &esc, &tx, &repaint) {
+        let _ = tx.send(WorkerMsg::Cancelled);
+        repaint();
+        return;
+    }
 
     // Remember the window we are typing into (if detection is on).
     let mut target = if cfg.detect_window_change {

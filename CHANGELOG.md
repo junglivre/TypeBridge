@@ -4,7 +4,33 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and the project follows
 [Semantic Versioning](https://semver.org/).
 
-## [1.0.2] - 2026-06-26
+## [2.0.0] - 2026-06-30
+
+### Added
+- **Wayland keyboard support.** Typing now works on native Wayland sessions, not
+  just X11. The right mechanism is selected automatically per compositor:
+  - **wlroots** (Sway, Hyprland, river, niri…) — a `zwp_virtual_keyboard` with
+    our own uploaded keymap. Layout-independent and needs no permission dialog.
+  - **GNOME / Mutter** — the RemoteDesktop portal's `NotifyKeyboardKeysym`; the
+    compositor resolves the keysym in the active layout itself.
+  - **KDE / KWin** — libei (RemoteDesktop portal) injecting keycodes, with the
+    active layout group read from KDE's D-Bus so symbols/Shift come out right.
+  - Anything else (or no portal, e.g. Cinnamon's Wayland) falls back to the X11
+    backend, which still reaches XWayland apps.
+- Update notifications now appear as a **startup popup** with the release notes
+  rendered as Markdown, plus Download / Dismiss actions.
+
+### Changed
+- **TLS now uses rustls** instead of native-tls, so the binary no longer depends
+  on OpenSSL/`libssl` — smaller surface and more portable Linux builds.
+- **Linux release binaries are built with `cargo-zigbuild` targeting an old
+  glibc (2.31)**, so they run on a wide range of distributions (Ubuntu 20.04+,
+  Debian 11+, Mint, Fedora, …) instead of only on very recent ones.
+
+### Fixed
+- Linux/Wayland keystrokes now reach native Wayland apps (the 1.0.2 limitation).
+
+
 
 ### Added
 - The UI language now defaults to the system locale on first run (pt-BR / es /
@@ -51,6 +77,7 @@ All notable changes to this project are documented here. The format is based on
 - GitHub Actions: CI (build/test) and multi-platform release builds
   (Windows/Linux/macOS, x86_64 and ARM64).
 
+[2.0.0]: https://github.com/junglivre/TypeBridge/releases/tag/2.0.0
 [1.0.2]: https://github.com/junglivre/TypeBridge/releases/tag/1.0.2
 [1.0.1]: https://github.com/junglivre/TypeBridge/releases/tag/1.0.1
 [1.0.0]: https://github.com/junglivre/TypeBridge/releases/tag/1.0.0

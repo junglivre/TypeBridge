@@ -16,7 +16,7 @@ compartido.
 *Simula entradas de teclado reales*. **No** pega y **no** envía el portapapeles.
 
 - Nativa (Rust + [egui]/[eframe]), sin runtime de Electron/Java/Python/.NET
-- Binario de release diminuto (~3,5 MB), arranque rápido, poca memoria
+- Binario nativo pequeño, arranque rápido, poca memoria
 - Sin telemetría, sin cuenta — funciona 100% sin conexión (la única llamada de
   red es una comprobación de actualización opcional y silenciosa)
 
@@ -43,9 +43,13 @@ automáticamente por GitHub Actions). O compila desde el código — ve
   locales).
 - **Interfaz multilingüe** — Inglés, Português (BR) y Español, conmutable en
   tiempo de ejecución.
+- **Linux: X11 *y* Wayland** — funciona en ambos; el backend de Wayland correcto
+  (wlroots / GNOME / KDE) se elige automáticamente. Ve
+  [cómo escribe](#cómo-escribe-typebridge).
 - **Comprobación de actualización integrada** — consulta silenciosamente GitHub
-  por una versión nueva al iniciar y muestra sus notas si existe (sin
-  telemetría; solo un ping de versión).
+  por una versión nueva al iniciar y, si existe, muestra un **popup con el
+  changelog** (renderizado en Markdown) y un enlace de descarga (sin telemetría;
+  solo un ping de versión).
 - **Guardia de foco** *(opcional)* — si la ventana enfocada cambia durante la
   escritura (una notificación roba el foco, cambias de ventana sin querer…), la
   escritura se **pausa**, la ventana pasa al frente (y parpadea en la barra de
@@ -144,13 +148,68 @@ Hay dos toolchains en Windows:
 
 ---
 
+## Cómo escribe TypeBridge
+
+Inyectar pulsaciones sintéticas es trivial en Windows y X11, pero un verdadero
+laberinto en Wayland: cada compositor expone un mecanismo distinto — e
+incompleto — y ninguno deja que una herramienta en segundo plano simplemente
+diga "escribe este texto". TypeBridge detecta el entorno y elige el backend
+correcto automáticamente en tiempo de ejecución:
+
+| Entorno | Backend | Manejo de la distribución |
+|---|---|---|
+| **Windows** | input Win32 (vía [enigo]) | Unicode, o scancodes físicos con mapa US fijo para VNC |
+| **macOS** | eventos CoreGraphics (vía [enigo]) | Unicode |
+| **Linux · X11** | XTEST (vía enigo `x11rb`) | lo maneja X |
+| **Linux · Wayland · wlroots** (Sway, Hyprland, river, niri…) | `zwp_virtual_keyboard` con **nuestro propio keymap** | independiente de la distribución — el keymap es nuestro |
+| **Linux · Wayland · GNOME** | portal RemoteDesktop `NotifyKeyboardKeysym` | Mutter resuelve el keysym en la distribución activa |
+| **Linux · Wayland · KDE** | libei (portal RemoteDesktop), inyección de keycodes | grupo de distribución activo leído del D-Bus de KDE |
+| **Linux · Wayland · otros / sin portal** (p. ej. Cinnamon) | recae en X11 / XWayland | lo maneja X (solo apps XWayland) |
+
+### Por qué Wayland necesita cuatro enfoques
+
+Wayland prohíbe a propósito la inyección global de input que permite el XTEST de
+X11, así que no hay una API única. Lo que hizo falta para que la escritura
+funcione en todos lados:
+
+- Los compositores **wlroots** implementan `zwp_virtual_keyboard`, que permite al
+  cliente **subir su propio keymap**. Subimos un keymap US y escribimos contra
+  él, así la salida es correcta *sin importar la distribución activa* y sin
+  diálogo de permiso. (Se vuelve la distribución activa del seat un instante
+  mientras escribe y luego revierte — una peculiaridad de wlroots, no un cambio
+  permanente de configuración.)
+- **GNOME** y **KDE** no soportan `zwp_virtual_keyboard`; la emulación de input
+  solo está disponible vía el **portal RemoteDesktop** (con un diálogo de
+  permiso):
+  - **GNOME/Mutter** resuelve el *keysym* en la distribución activa por sí mismo,
+    así que el `NotifyKeyboardKeysym` del portal sale correcto.
+  - **KDE/KWin** inyecta *keycodes* y los decodifica con el **grupo de
+    distribución activo** — pero, al ser un servicio en segundo plano, no puede
+    decirnos cuál es (el evento de Wayland relevante nunca le llega). Así que
+    TypeBridge lee la distribución activa del propio D-Bus de KDE
+    (`org.kde.keyboard`) y resuelve el keycode en ese grupo. (El propio camino de
+    keysym de KWin tenía el mismo punto ciego, corregido upstream solo a fines de
+    2025.)
+- **Compositores sin portal RemoteDesktop** (p. ej. el Wayland experimental de
+  Cinnamon) recaen en el backend X11, que aún alcanza apps XWayland.
+
+Nunca eliges el backend — todo es automático.
+
+### Binarios Linux portables
+
+Los binarios Linux publicados se compilan con
+[`cargo-zigbuild`](https://github.com/rust-cross/cargo-zigbuild) apuntando a
+**glibc 2.31**, y usan **rustls** para TLS (sin OpenSSL), así que un solo binario
+funciona en una amplia gama de distribuciones (Ubuntu 20.04+, Debian 11+, Mint,
+Fedora…) sin desajustes de versión de `libssl`/glibc.
+
 ## Notas por plataforma
 
 - **Windows** — funciona de inmediato.
-- **Linux** — X11 es totalmente compatible. **Wayland aún no es compatible** (las
-  teclas no llegan a las apps) — usa una sesión X11 por ahora; estamos
-  trabajando en ello. Dependencias de build: paquetes dev de X11/xcb +
-  xkbcommon + OpenSSL.
+- **Linux** — **X11 y Wayland** son compatibles (ve
+  [Cómo escribe TypeBridge](#cómo-escribe-typebridge)). Dependencias de build:
+  paquetes dev de X11/xcb + xkbcommon + Wayland (el TLS es Rust puro, sin
+  OpenSSL).
 - **macOS** — concede el permiso de Accesibilidad en *Ajustes del Sistema →
   Privacidad y Seguridad → Accesibilidad*; la app muestra un mensaje claro si
   falta.
@@ -165,7 +224,8 @@ src/
   i18n.rs              traducciones en tiempo de compilación (en / pt-br / es)
   ui/    app.rs        aplicación egui + bucle de actualización
          widgets.rs    pequeños helpers de UI
-  typing/engine.rs     motor de carácter → pulsación (Typer)
+  typing/engine.rs     motor de carácter → pulsación (Typer; enigo + Wayland)
+         wayland/      backends Wayland de Linux (libei · portal keysym · vkbd)
          worker.rs     hilo de escritura + canal de estado
          cancel.rs     flag de cancelación + vigilante del Esc físico
          window.rs     detección de la ventana enfocada (guardia de foco)
@@ -189,5 +249,6 @@ Hecho por [jung](https://jung.moe).
 
 [egui]: https://github.com/emilk/egui
 [eframe]: https://crates.io/crates/eframe
+[enigo]: https://github.com/enigo-rs/enigo
 [`confy`]: https://crates.io/crates/confy
 [WinLibs]: https://winlibs.com/

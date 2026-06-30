@@ -1,6 +1,6 @@
 [package]
 name = "typebridge"
-version = "1.0.2"
+version = "2.0.0"
 edition = "2021"
 description = "Types arbitrary text into the currently focused window (VNC, KVM, consoles, BIOS/IPMI)."
 license = "MIT OR Apache-2.0"
@@ -15,8 +15,7 @@ arboard = "3"
 serde = { version = "1", features = ["derive"] }
 confy = "0.6"
 device_query = "2"
-ureq = { version = "2", default-features = false, features = ["native-tls", "json"] }
-native-tls = "0.2"
+ureq = { version = "2", default-features = false, features = ["tls", "json"] }
 sys-locale = "0.3"
 
 [target.'cfg(windows)'.dependencies]
@@ -24,6 +23,16 @@ windows-sys = { version = "0.59", features = [
   "Win32_UI_WindowsAndMessaging",
   "Win32_UI_Input_KeyboardAndMouse",
 ] }
+
+# NOTE: Wayland backends — work in progress, NOT in the popup commit.
+[target.'cfg(target_os = "linux")'.dependencies]
+ashpd = { version = "0.12", default-features = false, features = ["async-std"] }
+reis = "0.5"
+xkbcommon = "0.2"
+futures = "0.3"
+wayland-client = "0.31"
+wayland-protocols-misc = "0.3"
+libc = "0.2"
 
 [dev-dependencies]
 toml = "0.8"

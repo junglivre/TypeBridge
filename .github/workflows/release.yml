@@ -78,11 +78,15 @@ jobs:
             ext: .exe
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
+            # Build against an old glibc (2.31) via zig so the binary runs on a
+            # wide range of distros, not just the CI runner's recent glibc.
+            zigtarget: x86_64-unknown-linux-gnu.2.31
             bin: typebridge
             label: linux-x86_64
             ext: ""
           - os: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
+            zigtarget: aarch64-unknown-linux-gnu.2.31
             bin: typebridge
             label: linux-arm64
             ext: ""
@@ -106,13 +110,26 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             libx11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev \
-            libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev \
-            libssl-dev
+            libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
+
+      # Linux only: zig is the C/cross toolchain cargo-zigbuild uses to target an
+      # old glibc (and to build the `ring` crypto crate).
+      - name: Set up zig
+        if: matrix.zigtarget
+        uses: mlugg/setup-zig@v1
+        with:
+          version: 0.13.0
+
+      - name: Install cargo-zigbuild
+        if: matrix.zigtarget
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-zigbuild
 
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
@@ -120,7 +137,13 @@ jobs:
           key: ${{ matrix.target }}
 
       - name: Build
-        run: cargo build --release --target ${{ matrix.target }}
+        shell: bash
+        run: |
+          if [ -n "${{ matrix.zigtarget }}" ]; then
+            cargo zigbuild --release --target "${{ matrix.zigtarget }}"
+          else
+            cargo build --release --target "${{ matrix.target }}"
+          fi
 
       - name: Stage artifact
         shell: bash

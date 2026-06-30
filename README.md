@@ -17,7 +17,7 @@ It *simulates real keyboard input*. It does **not** paste and does **not** send
 the clipboard.
 
 - Native (Rust + [egui]/[eframe]), no Electron/Java/Python/.NET runtime
-- Tiny release binary (~3.5 MB), fast startup, low memory
+- Small native binary, fast startup, low memory
 - No telemetry, no account — works fully offline (the only network call is an
   optional, silent update check)
 
@@ -42,8 +42,12 @@ by GitHub Actions). Or build from source — see [Building](#building).
   for Unicode injection (e.g. special characters in local apps).
 - **Multi-language UI** — English, Português (BR) and Español, switchable at
   runtime.
+- **Linux: X11 *and* Wayland** — works on both; the right Wayland backend
+  (wlroots / GNOME / KDE) is selected automatically. See
+  [how it types](#how-typebridge-types).
 - **Built-in update check** — silently checks GitHub for a newer release on
-  startup and shows its notes if one exists (no telemetry; just a version ping).
+  startup and, if one exists, shows a **popup with the changelog** (rendered as
+  Markdown) and a download link (no telemetry; just a version ping).
 - **Focus guard** *(optional)* — if the focused window changes mid-typing (a
   notification steals focus, you alt-tab by accident…), typing **pauses**, the
   window pops to the front (and flashes in the taskbar), and a prominent modal
@@ -136,12 +140,64 @@ There are two Windows toolchains:
 
 ---
 
+## How TypeBridge types
+
+Injecting synthetic keystrokes is trivial on Windows and X11, but a genuine maze
+on Wayland: each compositor exposes a different — and incomplete — mechanism, and
+none lets a background tool simply say "type this string". TypeBridge detects the
+environment and picks the right backend automatically at runtime:
+
+| Environment | Backend | Keyboard-layout handling |
+|---|---|---|
+| **Windows** | Win32 input (via [enigo]) | Unicode, or physical scancodes with a fixed US map for VNC |
+| **macOS** | CoreGraphics events (via [enigo]) | Unicode |
+| **Linux · X11** | XTEST (via enigo `x11rb`) | handled by X |
+| **Linux · Wayland · wlroots** (Sway, Hyprland, river, niri…) | `zwp_virtual_keyboard` with our **own uploaded keymap** | layout-independent — we own the keymap |
+| **Linux · Wayland · GNOME** | RemoteDesktop portal `NotifyKeyboardKeysym` | Mutter resolves the keysym in the active layout |
+| **Linux · Wayland · KDE** | libei (RemoteDesktop portal) keycode injection | active layout group read from KDE's D-Bus |
+| **Linux · Wayland · other / no portal** (e.g. Cinnamon) | falls back to X11 / XWayland | handled by X (XWayland apps only) |
+
+### Why Wayland needs four different approaches
+
+Wayland deliberately forbids the global input injection X11's XTEST allows, so
+there is no single API. What it took to make typing work everywhere:
+
+- **wlroots** compositors implement `zwp_virtual_keyboard`, which lets a client
+  **upload its own keymap**. We upload a US keymap and type against it, so the
+  output is correct *regardless of the active layout* and needs no permission
+  dialog. (It briefly becomes the seat's active layout while typing, then
+  reverts — a wlroots quirk, not a lasting config change.)
+- **GNOME** and **KDE** don't support `zwp_virtual_keyboard`; input emulation is
+  only available through the **RemoteDesktop portal** (a one-time permission
+  dialog):
+  - **GNOME/Mutter** resolves a *keysym* to the right key in the active layout
+    itself, so the portal's `NotifyKeyboardKeysym` is layout-correct out of the
+    box.
+  - **KDE/KWin** injects *keycodes* and decodes them with the **currently active
+    layout group** — but, as a background service, it can't tell us which group
+    that is (the relevant Wayland event never reaches it). So TypeBridge reads
+    the active layout from KDE's own D-Bus (`org.kde.keyboard`) and resolves the
+    keycode in that group. (KWin's own keysym path had the very same blind spot,
+    fixed upstream only in late 2025.)
+- **Compositors without a RemoteDesktop portal** (e.g. Cinnamon's experimental
+  Wayland) fall back to the X11 backend, which still reaches XWayland apps.
+
+You never pick a backend — it's all automatic.
+
+### Portable Linux binaries
+
+The published Linux binaries are built with
+[`cargo-zigbuild`](https://github.com/rust-cross/cargo-zigbuild) targeting
+**glibc 2.31**, and use **rustls** for TLS (no OpenSSL), so a single binary runs
+across a wide range of distributions (Ubuntu 20.04+, Debian 11+, Mint, Fedora…)
+without `libssl`/glibc version mismatches.
+
 ## Platform notes
 
 - **Windows** — works out of the box.
-- **Linux** — X11 is fully supported. **Wayland is not supported yet**
-  (keystrokes don't reach apps) — use an X11 session for now; we're working on
-  it. Build deps: X11/xcb + xkbcommon + OpenSSL dev packages.
+- **Linux** — both **X11 and Wayland** are supported (see
+  [How TypeBridge types](#how-typebridge-types)). Build deps: X11/xcb +
+  xkbcommon + Wayland dev packages (TLS is pure-Rust, so no OpenSSL needed).
 - **macOS** — grant Accessibility permission under *System Settings → Privacy &
   Security → Accessibility*; the app reports a clear message if it's missing.
 
@@ -155,7 +211,8 @@ src/
   i18n.rs              compile-time translations (en / pt-br / es)
   ui/    app.rs        egui application + update loop
          widgets.rs    small UI helpers
-  typing/engine.rs     char → keystroke engine (Typer)
+  typing/engine.rs     char → keystroke engine (Typer; enigo + Wayland)
+         wayland/      Linux Wayland backends (libei · portal keysym · vkbd)
          worker.rs     background typing thread + status channel
          cancel.rs     cancel flag + physical-Esc watcher
          window.rs     foreground-window detection (focus guard)
@@ -179,5 +236,6 @@ Made by [jung](https://jung.moe).
 
 [egui]: https://github.com/emilk/egui
 [eframe]: https://crates.io/crates/eframe
+[enigo]: https://github.com/enigo-rs/enigo
 [`confy`]: https://crates.io/crates/confy
 [WinLibs]: https://winlibs.com/

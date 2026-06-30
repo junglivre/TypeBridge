@@ -87,21 +87,56 @@ impl std::fmt::Display for TypeError {
     }
 }
 
-/// Wraps the keyboard backend; sends one character at a time.
+/// Wraps the platform keyboard backend; sends one character at a time.
+///
+/// On Linux Wayland the [`Typer`] may use a Wayland-native backend (libei /
+/// portal keysym / virtual keyboard); everywhere else (Windows, macOS, X11, and
+/// Wayland sessions with no usable backend) it falls back to enigo.
 pub struct Typer {
-    enigo: Enigo,
-    mode: KeyMode,
+    inner: Inner,
+}
+
+enum Inner {
+    Enigo(EnigoTyper),
+    #[cfg(target_os = "linux")]
+    Wayland(crate::typing::wayland::WaylandTyper),
 }
 
 impl Typer {
     pub fn new(mode: KeyMode) -> Result<Self, TypeError> {
-        Enigo::new(&Settings::default())
-            .map(|enigo| Self { enigo, mode })
-            .map_err(|e| TypeError::Init(e.to_string()))
+        #[cfg(target_os = "linux")]
+        {
+            match crate::typing::wayland::WaylandTyper::try_connect() {
+                Ok(Some(w)) => return Ok(Self { inner: Inner::Wayland(w) }),
+                Ok(None) => {} // fall back to enigo (X11 / XWayland)
+                Err(e) => return Err(TypeError::Init(e)),
+            }
+        }
+        let enigo = Enigo::new(&Settings::default()).map_err(|e| TypeError::Init(e.to_string()))?;
+        Ok(Self {
+            inner: Inner::Enigo(EnigoTyper { enigo, mode }),
+        })
     }
 
     /// Inject the keystroke(s) for a single character.
     pub fn send(&mut self, c: char) -> Result<(), TypeError> {
+        match &mut self.inner {
+            Inner::Enigo(e) => e.send(c),
+            #[cfg(target_os = "linux")]
+            Inner::Wayland(w) => w.send(c).map_err(TypeError::Inject),
+        }
+    }
+}
+
+/// The enigo-backed typer (Windows, macOS, X11, XWayland fallback).
+struct EnigoTyper {
+    enigo: Enigo,
+    mode: KeyMode,
+}
+
+impl EnigoTyper {
+    /// Inject the keystroke(s) for a single character.
+    fn send(&mut self, c: char) -> Result<(), TypeError> {
         match classify(c) {
             CharAction::Skip => Ok(()),
             CharAction::Enter => self.tap(Key::Return),
