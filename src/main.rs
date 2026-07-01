@@ -113,6 +113,20 @@ mod tests {
     }
 }
 
+/// Decode the embedded window/taskbar icon (a transparent rounded-square PNG).
+fn load_icon() -> egui::IconData {
+    let png = include_bytes!("../assets/icon.png");
+    let image = image::load_from_memory(png)
+        .expect("embedded icon should decode")
+        .into_rgba8();
+    let (width, height) = image.dimensions();
+    egui::IconData {
+        rgba: image.into_raw(),
+        width,
+        height,
+    }
+}
+
 fn main() -> eframe::Result<()> {
     let cfg = Config::load();
     let cli = parse_cli();
@@ -121,6 +135,7 @@ fn main() -> eframe::Result<()> {
         viewport: egui::ViewportBuilder::default()
             .with_title("TypeBridge")
             .with_app_id("typebridge")
+            .with_icon(std::sync::Arc::new(load_icon()))
             .with_inner_size([cfg.window_width.max(360.0), cfg.window_height.max(420.0)])
             .with_min_inner_size([360.0, 420.0]),
         ..Default::default()

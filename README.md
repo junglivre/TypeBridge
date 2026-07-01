@@ -23,9 +23,36 @@ the clipboard.
 
 ## Download
 
-Prebuilt binaries for **Windows, Linux and macOS** are attached to every
-[release](https://github.com/junglivre/TypeBridge/releases) (built automatically
-by GitHub Actions). Or build from source — see [Building](#building).
+> **Just want to use it?** No installer — download one file and open it.
+
+**1. Get the file for your system** from the
+**[latest release](https://github.com/junglivre/TypeBridge/releases/latest)**
+(open the **Assets** list and click the matching file):
+
+| Your system | File to download |
+|---|---|
+| **Windows** — most PCs | `typebridge-…-windows-x86_64.exe` |
+| **Windows** — ARM (Snapdragon, Surface Pro X) | `typebridge-…-windows-arm64.exe` |
+| **macOS** — Apple Silicon (M1–M4, 2020+) | `typebridge-…-macos-arm64` |
+| **macOS** — Intel (2019 and older) | `typebridge-…-macos-x86_64` |
+| **Linux** — most PCs | `typebridge-…-linux-x86_64` |
+| **Linux** — ARM (Raspberry Pi 4/5, ARM servers) | `typebridge-…-linux-arm64` |
+
+> Not sure about **x86_64 vs ARM**? Pick **x86_64** — it's almost every PC.
+
+**2. Open it:**
+
+- **Windows** — double-click the `.exe`. If you see *"Windows protected your
+  PC"*, click **More info → Run anyway**. (The app is open-source but not
+  code-signed, so Windows is just being cautious.)
+- **macOS** — in Terminal: `chmod +x typebridge-*-macos-*` then
+  `./typebridge-*-macos-*`. If macOS blocks it as from an *"unidentified
+  developer"*, allow it in **System Settings → Privacy & Security → Open
+  Anyway**, and grant **Accessibility** when asked.
+- **Linux** — `chmod +x typebridge-*-linux-*` then `./typebridge-*-linux-*`.
+  The binaries run on most modern distributions (glibc 2.31+).
+
+Prefer to build it yourself? See [Building](#building).
 
 ---
 

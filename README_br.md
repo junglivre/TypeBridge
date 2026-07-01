@@ -23,10 +23,36 @@ transferência.
 
 ## Download
 
-Binários prontos para **Windows, Linux e macOS** são anexados a cada
-[release](https://github.com/junglivre/TypeBridge/releases) (gerados
-automaticamente pelo GitHub Actions). Ou compile do código — veja
-[Compilando](#compilando).
+> **Só quer usar?** Sem instalador — baixe um arquivo e abra.
+
+**1. Pegue o arquivo do seu sistema** na
+**[última release](https://github.com/junglivre/TypeBridge/releases/latest)**
+(abra a lista **Assets** e clique no arquivo correspondente):
+
+| Seu sistema | Arquivo para baixar |
+|---|---|
+| **Windows** — maioria dos PCs | `typebridge-…-windows-x86_64.exe` |
+| **Windows** — ARM (Snapdragon, Surface Pro X) | `typebridge-…-windows-arm64.exe` |
+| **macOS** — Apple Silicon (M1–M4, 2020+) | `typebridge-…-macos-arm64` |
+| **macOS** — Intel (2019 ou mais antigo) | `typebridge-…-macos-x86_64` |
+| **Linux** — maioria dos PCs | `typebridge-…-linux-x86_64` |
+| **Linux** — ARM (Raspberry Pi 4/5, servidores ARM) | `typebridge-…-linux-arm64` |
+
+> Na dúvida entre **x86_64 e ARM**? Pegue **x86_64** — é quase todo PC.
+
+**2. Abra:**
+
+- **Windows** — dê dois cliques no `.exe`. Se aparecer *"O Windows protegeu seu
+  PC"*, clique em **Mais informações → Executar assim mesmo**. (O app é open
+  source, mas não é assinado, então o Windows só está sendo cauteloso.)
+- **macOS** — no Terminal: `chmod +x typebridge-*-macos-*` e depois
+  `./typebridge-*-macos-*`. Se o macOS bloquear como de *"desenvolvedor não
+  identificado"*, libere em **Ajustes do Sistema → Privacidade e Segurança →
+  Abrir mesmo assim**, e conceda **Acessibilidade** quando pedir.
+- **Linux** — `chmod +x typebridge-*-linux-*` e depois `./typebridge-*-linux-*`.
+  Os binários rodam na maioria das distros modernas (glibc 2.31+).
+
+Prefere compilar você mesmo? Veja [Compilando](#compilando).
 
 ---
 

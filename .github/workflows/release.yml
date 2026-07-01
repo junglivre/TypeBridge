@@ -23,28 +23,44 @@ jobs:
         shell: bash
         run: |
           TAG="${GITHUB_REF_NAME}"
-          # Prefer the matching section from CHANGELOG.md.
+          # Changelog section (preferred), with a commit-log fallback.
+          CHANGES=""
           if [ -f CHANGELOG.md ]; then
-            awk -v hdr="## [$TAG]" '
+            CHANGES="$(awk -v hdr="## [$TAG]" '
               index($0, hdr) == 1 { flag=1; next }
               flag && index($0, "## [") == 1 { flag=0 }
               flag
-            ' CHANGELOG.md > NOTES.md
+            ' CHANGELOG.md)"
           fi
-          # Fall back to the commit log if there is no CHANGELOG entry.
-          if [ ! -s NOTES.md ]; then
+          if [ -z "$CHANGES" ]; then
             PREV="$(git describe --tags --abbrev=0 "${TAG}^" 2>/dev/null || echo "")"
-            {
-              echo "## Changelog"
-              echo ""
-              if [ -n "$PREV" ]; then
-                git log "${PREV}..${TAG}" --no-merges --pretty=format:'- %s'
-              else
-                git log "${TAG}" --no-merges --pretty=format:'- %s'
-              fi
-              echo ""
-            } > NOTES.md
+            if [ -n "$PREV" ]; then
+              CHANGES="$(git log "${PREV}..${TAG}" --no-merges --pretty=format:'- %s')"
+            else
+              CHANGES="$(git log "${TAG}" --no-merges --pretty=format:'- %s')"
+            fi
           fi
+          # Lead with a plain-language download guide, then the changelog.
+          cat > NOTES.md <<EOF
+          ### ⬇️ Download
+
+          Pick the file for your system from **Assets** below. Not sure about x86_64 vs ARM? Pick **x86_64** — it's almost every PC.
+
+          | Your system | File |
+          |---|---|
+          | Windows (most PCs) | \`typebridge-${TAG}-windows-x86_64.exe\` |
+          | Windows on ARM | \`typebridge-${TAG}-windows-arm64.exe\` |
+          | macOS (Apple Silicon, M1+) | \`typebridge-${TAG}-macos-arm64\` |
+          | macOS (Intel) | \`typebridge-${TAG}-macos-x86_64\` |
+          | Linux (most PCs) | \`typebridge-${TAG}-linux-x86_64\` |
+          | Linux on ARM | \`typebridge-${TAG}-linux-arm64\` |
+
+          How to run it (and the Windows/macOS security prompts): see the [README](https://github.com/${GITHUB_REPOSITORY}#download).
+
+          ---
+
+          EOF
+          printf '%s\n' "$CHANGES" >> NOTES.md
           echo "----- notes -----"; cat NOTES.md
 
       - name: Create release

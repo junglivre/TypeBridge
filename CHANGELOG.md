@@ -4,6 +4,24 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and the project follows
 [Semantic Versioning](https://semver.org/).
 
+**Downloads:** get the binary for your system from the
+[latest release](https://github.com/junglivre/TypeBridge/releases/latest) — the
+[README](https://github.com/junglivre/TypeBridge#download) shows which file to
+pick and how to run it. Each version below links to its release.
+
+## [2.1.0] - 2026-06-30
+
+### Added
+- **Application icon** — shown in the window title bar, the taskbar, and (on
+  Windows) the executable itself in Explorer.
+
+### Changed
+- Much clearer **[Download](https://github.com/junglivre/TypeBridge#download)**
+  guide in the README: a "which file do I get?" table per system (Windows /
+  macOS / Linux, x86_64 / ARM), plus how to open it — including the Windows
+  SmartScreen and macOS Gatekeeper prompts that non-technical users hit.
+- Every GitHub release now leads with the same plain-language download guide.
+
 ## [2.0.0] - 2026-06-30
 
 ### Added
@@ -77,6 +95,7 @@ All notable changes to this project are documented here. The format is based on
 - GitHub Actions: CI (build/test) and multi-platform release builds
   (Windows/Linux/macOS, x86_64 and ARM64).
 
+[2.1.0]: https://github.com/junglivre/TypeBridge/releases/tag/2.1.0
 [2.0.0]: https://github.com/junglivre/TypeBridge/releases/tag/2.0.0
 [1.0.2]: https://github.com/junglivre/TypeBridge/releases/tag/1.0.2
 [1.0.1]: https://github.com/junglivre/TypeBridge/releases/tag/1.0.1
