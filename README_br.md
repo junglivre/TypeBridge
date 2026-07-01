@@ -1,12 +1,12 @@
+<img src="assets/icon.png" alt="TypeBridge" width="80">
+
 # TypeBridge
 
 [![CI](https://github.com/junglivre/TypeBridge/actions/workflows/ci.yml/badge.svg)](https://github.com/junglivre/TypeBridge/actions/workflows/ci.yml)
 [![Última versão](https://img.shields.io/github/v/release/junglivre/TypeBridge?sort=semver)](https://github.com/junglivre/TypeBridge/releases/latest)
 [![Licença](https://img.shields.io/badge/licen%C3%A7a-MIT%20OR%20Apache--2.0-blue)](LICENSE-MIT)
 
-- [English](README.md)
-- **Português**
-- [Español](README_es.md)
+[English](README.md) • **Português** • [Español](README_es.md)
 
 Um utilitário leve e multiplataforma que **digita texto na janela que está em
 foco** — uma tecla de cada vez. Feito para VNC, Guacamole, KVMs, consoles

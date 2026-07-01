@@ -1,12 +1,12 @@
+<img src="assets/icon.png" alt="TypeBridge" width="80">
+
 # TypeBridge
 
 [![CI](https://github.com/junglivre/TypeBridge/actions/workflows/ci.yml/badge.svg)](https://github.com/junglivre/TypeBridge/actions/workflows/ci.yml)
 [![Última versión](https://img.shields.io/github/v/release/junglivre/TypeBridge?sort=semver)](https://github.com/junglivre/TypeBridge/releases/latest)
 [![Licencia](https://img.shields.io/badge/licencia-MIT%20OR%20Apache--2.0-blue)](LICENSE-MIT)
 
-- [English](README.md)
-- [Português](README_br.md)
-- **Español**
+[English](README.md) • [Português](README_br.md) • **Español**
 
 Una utilidad ligera y multiplataforma que **escribe texto en la ventana que
 tiene el foco** — una pulsación a la vez. Pensada para VNC, Guacamole, KVMs,
