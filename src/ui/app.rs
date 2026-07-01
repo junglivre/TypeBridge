@@ -63,6 +63,9 @@ pub struct TypeBridgeApp {
 
 impl TypeBridgeApp {
     pub fn new(cc: &eframe::CreationContext<'_>, cfg: Config, cli: CliArgs) -> Self {
+        // Always use the dark theme, regardless of the OS setting (some remote /
+        // RDP sessions report light mode).
+        cc.egui_ctx.set_theme(egui::ThemePreference::Dark);
         cc.egui_ctx.style_mut(|s| {
             s.spacing.item_spacing = egui::vec2(8.0, 8.0);
             s.spacing.button_padding = egui::vec2(10.0, 6.0);

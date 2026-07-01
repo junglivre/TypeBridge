@@ -9,6 +9,16 @@ All notable changes to this project are documented here. The format is based on
 [README](https://github.com/junglivre/TypeBridge#download) shows which file to
 pick and how to run it. Each version below links to its release.
 
+## [2.2.0] - 2026-07-01
+
+### Fixed
+- **Rendering backend now works without graphics acceleration.** Switched from
+  OpenGL (glow) to wgpu with a software fallback (Direct3D WARP on Windows), so
+  TypeBridge runs in RDP sessions and on VMs/older machines that don't provide
+  OpenGL 2.0+ (previously it failed to start with an OpenGL error). The dark
+  theme is now always used, so it no longer appears in light mode on remote
+  sessions.
+
 ## [2.1.0] - 2026-06-30
 
 ### Added
@@ -95,6 +105,7 @@ pick and how to run it. Each version below links to its release.
 - GitHub Actions: CI (build/test) and multi-platform release builds
   (Windows/Linux/macOS, x86_64 and ARM64).
 
+[2.2.0]: https://github.com/junglivre/TypeBridge/releases/tag/2.2.0
 [2.1.0]: https://github.com/junglivre/TypeBridge/releases/tag/2.1.0
 [2.0.0]: https://github.com/junglivre/TypeBridge/releases/tag/2.0.0
 [1.0.2]: https://github.com/junglivre/TypeBridge/releases/tag/1.0.2

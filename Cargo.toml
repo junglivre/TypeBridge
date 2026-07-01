@@ -1,13 +1,22 @@
 [package]
 name = "typebridge"
-version = "2.1.0"
+version = "2.2.0"
 edition = "2021"
 description = "Types arbitrary text into the currently focused window (VNC, KVM, consoles, BIOS/IPMI)."
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/junglivre/TypeBridge"
 
 [dependencies]
-eframe = "0.31"
+# Use the wgpu renderer instead of glow: it falls back to software rendering
+# (Direct3D WARP on Windows, llvmpipe/GL on Linux) on machines without a usable
+# OpenGL 2.0+ driver — common on VMs, RDP sessions and older hardware.
+eframe = { version = "0.31", default-features = false, features = [
+  "accesskit",
+  "default_fonts",
+  "wgpu",
+  "x11",
+  "wayland",
+] }
 egui = "0.31"
 egui_commonmark = { version = "0.20", default-features = false }
 enigo = { version = "0.3", default-features = false, features = ["x11rb"] }
@@ -27,6 +36,9 @@ windows-sys = { version = "0.59", features = [
   "Win32_UI_WindowsAndMessaging",
   "Win32_UI_Input_KeyboardAndMouse",
 ] }
+# Enable wgpu's Direct3D 12 backend so the software WARP adapter is available on
+# machines without a GPU (RDP sessions, VMs); egui-wgpu doesn't enable it itself.
+wgpu = { version = "24", features = ["dx12"] }
 
 # Linux Wayland backends (libei · portal keysym · virtual keyboard).
 [target.'cfg(target_os = "linux")'.dependencies]

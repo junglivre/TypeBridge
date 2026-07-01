@@ -127,6 +127,33 @@ fn load_icon() -> egui::IconData {
     }
 }
 
+/// A wgpu setup that prefers real hardware but falls back to a software adapter
+/// (Direct3D WARP on Windows, llvmpipe on Linux) when none is present — so the
+/// app runs over RDP and on VMs without GPU acceleration. `request_adapter`
+/// alone never returns the software adapter, so we pick it from the enumerated
+/// list ourselves.
+fn wgpu_config() -> eframe::egui_wgpu::WgpuConfiguration {
+    use eframe::egui_wgpu::{wgpu, NativeAdapterSelectorMethod, WgpuSetup};
+
+    let selector: NativeAdapterSelectorMethod = std::sync::Arc::new(
+        |adapters: &[wgpu::Adapter], _surface: Option<&wgpu::Surface<'_>>| {
+            // Real hardware if present; otherwise the software adapter (WARP).
+            adapters
+                .iter()
+                .find(|a| a.get_info().device_type != wgpu::DeviceType::Cpu)
+                .or_else(|| adapters.first())
+                .cloned()
+                .ok_or_else(|| "no wgpu adapter found (including software fallback)".to_owned())
+        },
+    );
+
+    let mut cfg = eframe::egui_wgpu::WgpuConfiguration::default();
+    if let WgpuSetup::CreateNew(setup) = &mut cfg.wgpu_setup {
+        setup.native_adapter_selector = Some(selector);
+    }
+    cfg
+}
+
 fn main() -> eframe::Result<()> {
     let cfg = Config::load();
     let cli = parse_cli();
@@ -138,6 +165,7 @@ fn main() -> eframe::Result<()> {
             .with_icon(std::sync::Arc::new(load_icon()))
             .with_inner_size([cfg.window_width.max(360.0), cfg.window_height.max(420.0)])
             .with_min_inner_size([360.0, 420.0]),
+        wgpu_options: wgpu_config(),
         ..Default::default()
     };
 
